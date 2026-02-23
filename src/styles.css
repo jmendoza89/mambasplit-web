@@ -439,6 +439,69 @@ button:disabled {
   gap: 10px;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 32, 44, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 40;
+}
+
+.modal-card {
+  width: min(420px, 100%);
+  background: #f4f7f7;
+  border: 1px solid rgba(2, 64, 89, 0.22);
+  border-radius: 14px;
+  box-shadow: 0 18px 42px rgba(2, 64, 89, 0.34);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  background: linear-gradient(130deg, #58bda5, #6ed9bd);
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #f5fffb;
+}
+
+.modal-close {
+  background: transparent;
+  color: #f5fffb;
+  border: none;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.modal-card form {
+  padding: 16px;
+}
+
+.modal-actions {
+  justify-content: flex-end;
+}
+
+.expense-save-status {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(10, 106, 79, 0.25);
+  border-radius: 10px;
+  background: rgba(223, 255, 244, 0.92);
+  color: var(--success);
+  font-weight: 700;
+}
+
 .member-list,
 .expense-list {
   list-style: none;
@@ -533,6 +596,12 @@ button:disabled {
 
   .expense-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .modal-overlay {
+    align-items: flex-start;
+    overflow-y: auto;
+    padding-top: 28px;
   }
 
   .inline-form {

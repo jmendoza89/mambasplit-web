@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   authApi,
   clearSession,
@@ -36,8 +36,12 @@ export default function App() {
   const [inviteResult, setInviteResult] = useState(null);
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [expenseSavedStatus, setExpenseSavedStatus] = useState(null);
 
   const [busy, setBusy] = useState(false);
+  const expenseDescriptionRef = useRef(null);
+  const expenseAmountRef = useRef(null);
 
   const currentName = useMemo(() => (me && me.displayName) || (user && user.displayName) || "User", [me, user]);
   const currentEmail = useMemo(() => (me && me.email) || (user && user.email) || "-", [me, user]);
@@ -154,6 +158,28 @@ export default function App() {
     if (groupDetail && (groupDetail.group?.id === selectedGroupId || groupDetail.id === selectedGroupId)) return;
     loadGroupDetail(selectedGroupId);
   }, [activeView, selectedGroupId, groupDetail]);
+
+  useEffect(() => {
+    if (!isExpenseModalOpen) return;
+
+    const focusTimer = window.setTimeout(() => {
+      if (expenseDescriptionRef.current) {
+        expenseDescriptionRef.current.focus();
+      }
+    }, 0);
+
+    function onEscape(event) {
+      if (event.key === "Escape") {
+        setIsExpenseModalOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", onEscape);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener("keydown", onEscape);
+    };
+  }, [isExpenseModalOpen]);
 
   async function onSubmitAuth(e) {
     e.preventDefault();
@@ -272,7 +298,7 @@ export default function App() {
   }
 
   async function onCreateExpense(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!selectedGroupId || !expenseDescription.trim() || !expenseAmount.trim()) return;
     if (!isUuid(currentId)) {
       setError("Could not determine current user id for payer.");
@@ -293,6 +319,7 @@ export default function App() {
 
     setError("");
     setSuccess("");
+    setExpenseSavedStatus(null);
     setBusy(true);
     try {
       await groupsApi.createEqualExpense(selectedGroupId, {
@@ -301,15 +328,49 @@ export default function App() {
         amountCents: Math.round(numericAmount * 100),
         participants
       });
+      const savedDescription = expenseDescription.trim();
+      const savedAmount = numericAmount;
       setExpenseDescription("");
       setExpenseAmount("");
-      setSuccess("Expense added.");
+      setExpenseSavedStatus({
+        description: savedDescription,
+        amount: savedAmount,
+        savedAt: new Date().toISOString()
+      });
       await loadGroupDetail(selectedGroupId);
+      if (expenseDescriptionRef.current) {
+        expenseDescriptionRef.current.focus();
+      }
     } catch (err) {
       setError(err.message || "Could not add expense.");
     } finally {
       setBusy(false);
     }
+  }
+
+  function onExpenseDescriptionKeyDown(e) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+
+    if (expenseAmount.trim()) {
+      onCreateExpense();
+      return;
+    }
+
+    if (expenseAmountRef.current) {
+      expenseAmountRef.current.focus();
+    }
+  }
+
+  function onOpenExpenseModal() {
+    setExpenseSavedStatus(null);
+    setExpenseDescription("");
+    setExpenseAmount("");
+    setIsExpenseModalOpen(true);
+  }
+
+  function onCloseExpenseModal() {
+    setIsExpenseModalOpen(false);
   }
 
   async function onDeleteGroup() {
@@ -610,6 +671,14 @@ export default function App() {
                 </button>
                 <div className="dash-top-actions">
                   <button
+                    className="btn-primary"
+                    type="button"
+                    onClick={onOpenExpenseModal}
+                    disabled={!selectedGroupId || groupLoading}
+                  >
+                    Add Expense
+                  </button>
+                  <button
                     className="btn-secondary"
                     type="button"
                     onClick={() => loadGroupDetail(selectedGroupId, { force: true })}
@@ -683,49 +752,6 @@ export default function App() {
 
                   <div className="group-stack">
                     <article className="card panel section-panel">
-                      <h3>Add Expense</h3>
-                      <form onSubmit={onCreateExpense}>
-                        <div className="field">
-                          <label htmlFor="expenseDescription">Description</label>
-                          <input
-                            id="expenseDescription"
-                            type="text"
-                            value={expenseDescription}
-                            onChange={(e) => setExpenseDescription(e.target.value)}
-                            placeholder="Dinner, groceries, taxi..."
-                            maxLength={200}
-                            required
-                          />
-                        </div>
-
-                        <div className="expense-form-grid">
-                          <div className="field">
-                            <label htmlFor="expenseAmount">Amount</label>
-                            <input
-                              id="expenseAmount"
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              value={expenseAmount}
-                              onChange={(e) => setExpenseAmount(e.target.value)}
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="actions">
-                          <button
-                            type="submit"
-                            className="btn-primary"
-                            disabled={busy || groupLoading || !selectedGroupId}
-                          >
-                            Add Expense
-                          </button>
-                        </div>
-                      </form>
-                    </article>
-
-                    <article className="card panel section-panel">
                       <h3>Recent Expenses</h3>
                       {expenses.length ? (
                         <ul className="expense-list">
@@ -750,7 +776,7 @@ export default function App() {
                           ))}
                         </ul>
                       ) : (
-                        <p className="list-empty">No expenses yet. Use the form above to add the first one.</p>
+                        <p className="list-empty">No expenses yet. Use Add Expense to create the first one.</p>
                       )}
                     </article>
                   </div>
@@ -760,6 +786,85 @@ export default function App() {
           </section>
         )}
       </main>
+      {isExpenseModalOpen ? (
+        <div
+          className="modal-overlay"
+          onClick={onCloseExpenseModal}
+          role="presentation"
+        >
+          <section
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="addExpenseModalTitle"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3 id="addExpenseModalTitle">Add an expense</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={onCloseExpenseModal}
+                aria-label="Close add expense popup"
+              >
+                x
+              </button>
+            </div>
+            <form onSubmit={onCreateExpense}>
+              <div className="field">
+                <label htmlFor="expenseDescription">Description</label>
+                <input
+                  ref={expenseDescriptionRef}
+                  id="expenseDescription"
+                  type="text"
+                  value={expenseDescription}
+                  onChange={(e) => setExpenseDescription(e.target.value)}
+                  onKeyDown={onExpenseDescriptionKeyDown}
+                  placeholder="Dinner, groceries, taxi..."
+                  maxLength={200}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="expenseAmount">Amount</label>
+                <input
+                  ref={expenseAmountRef}
+                  id="expenseAmount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={expenseAmount}
+                  onChange={(e) => setExpenseAmount(e.target.value)}
+                  required
+                />
+              </div>
+              {expenseSavedStatus ? (
+                <p className="expense-save-status" aria-live="polite">
+                  Saved: {expenseSavedStatus.description} ({formatMoney(expenseSavedStatus.amount)}) at{" "}
+                  {formatDate(expenseSavedStatus.savedAt)}
+                </p>
+              ) : null}
+              <div className="actions modal-actions">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={onCloseExpenseModal}
+                  disabled={busy}
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={busy || groupLoading || !selectedGroupId}
+                >
+                  {busy ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -812,7 +917,7 @@ function normalizeExpenses(group, members) {
     return {
       id: expense.id || `expense-${index}`,
       description: expense.description || expense.title || "Expense",
-      amount: expense.amount ?? expense.amountCents,
+      amount: expense.amount ?? (typeof expense.amountCents === "number" ? expense.amountCents / 100 : expense.amountCents),
       currency: expense.currency || "USD",
       payerUserId,
       paidBy: expense.paidBy || expense.payerName || payerMember?.name || expense.payer?.displayName || "Unknown",
