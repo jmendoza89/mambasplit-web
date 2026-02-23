@@ -12,6 +12,8 @@ function withBase(path) {
   return `${apiBase()}${path}`;
 }
 
+let refreshInFlight = null;
+
 export function getAccessToken() {
   return localStorage.getItem(STORAGE_KEYS.access);
 }
@@ -44,17 +46,58 @@ export function clearSession() {
   localStorage.removeItem(STORAGE_KEYS.user);
 }
 
-export async function api(path, method = "GET", body = null, auth = true) {
+async function request(path, method = "GET", body = null, auth = true) {
   const headers = { "Content-Type": "application/json" };
   if (auth && getAccessToken()) {
     headers.Authorization = `Bearer ${getAccessToken()}`;
   }
 
-  const response = await fetch(withBase(path), {
+  return fetch(withBase(path), {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined
   });
+}
+
+async function refreshAccessToken() {
+  if (refreshInFlight) return refreshInFlight;
+
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) throw new Error("Session expired.");
+
+  refreshInFlight = (async () => {
+    const response = await request("/api/v1/auth/refresh", "POST", { refreshToken }, false);
+    if (!response.ok) {
+      clearSession();
+      const err = new Error("Session expired.");
+      err.status = response.status;
+      throw err;
+    }
+
+    const data = await response.json();
+    if (data?.accessToken) {
+      localStorage.setItem(STORAGE_KEYS.access, data.accessToken);
+    }
+    if (data?.refreshToken) {
+      localStorage.setItem(STORAGE_KEYS.refresh, data.refreshToken);
+    }
+    return data;
+  })();
+
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
+export async function api(path, method = "GET", body = null, auth = true) {
+  let response = await request(path, method, body, auth);
+  const isAuthRoute = path.startsWith("/api/v1/auth/");
+  if (auth && !isAuthRoute && (response.status === 401 || response.status === 403)) {
+    await refreshAccessToken();
+    response = await request(path, method, body, auth);
+  }
 
   if (response.status === 204) return null;
 
@@ -66,7 +109,7 @@ export async function api(path, method = "GET", body = null, auth = true) {
   }
 
   if (!response.ok) {
-    const message = (data && data.message) || "Request failed.";
+    const message = (data && data.message) || `Request failed (${response.status}).`;
     const err = new Error(message);
     err.status = response.status;
     throw err;
@@ -93,7 +136,28 @@ export const meApi = {
 export const groupsApi = {
   list: () => api("/api/v1/groups"),
   create: (name) => api("/api/v1/groups", "POST", { name }),
-  details: (groupId) => api(`/api/v1/groups/${groupId}`),
+  delete: (groupId) => api(`/api/v1/groups/${groupId}`, "DELETE"),
+  details: async (groupId) => {
+    let firstError = null;
+    try {
+      return await api(`/api/v1/groups/${groupId}/details`);
+    } catch (err) {
+      firstError = err;
+      // If auth fails, bubbling immediately is clearer than attempting fallback.
+      if (err.status === 401 || err.status === 403) throw err;
+    }
+
+    try {
+      return await api(`/api/v1/groups/${groupId}`);
+    } catch (fallbackErr) {
+      if (fallbackErr.status === 401 || fallbackErr.status === 403) throw fallbackErr;
+      const combined = new Error(
+        `Group details failed (details: ${firstError?.status || "?"}, fallback: ${fallbackErr?.status || "?"}).`
+      );
+      combined.status = fallbackErr.status || firstError?.status;
+      throw combined;
+    }
+  },
   createEqualExpense: (groupId, payload) => api(`/api/v1/groups/${groupId}/expenses/equal`, "POST", payload),
   createInvite: (groupId, email) => api(`/api/v1/groups/${groupId}/invites`, "POST", { email }),
   acceptInvite: (token) => api("/api/v1/invites/accept", "POST", { token })

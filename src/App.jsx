@@ -24,6 +24,7 @@ export default function App() {
   const [groupDetail, setGroupDetail] = useState(null);
   const [groupLoading, setGroupLoading] = useState(false);
   const [groupError, setGroupError] = useState("");
+  const [groupDetailStatusById, setGroupDetailStatusById] = useState({});
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,16 +49,41 @@ export default function App() {
   );
 
   const displayedGroup = useMemo(() => {
-    if (groupDetail && groupDetail.id === selectedGroupId) return groupDetail;
+    if (groupDetail && (groupDetail.group?.id === selectedGroupId || groupDetail.id === selectedGroupId)) return groupDetail;
     return selectedGroup;
   }, [groupDetail, selectedGroup, selectedGroupId]);
 
   const members = useMemo(() => normalizeMembers(displayedGroup), [displayedGroup]);
-  const expenses = useMemo(() => normalizeExpenses(displayedGroup), [displayedGroup]);
-  const totalExpense = useMemo(
-    () => expenses.reduce((sum, expense) => sum + toNumberAmount(expense.amount), 0),
-    [expenses]
-  );
+  const expenses = useMemo(() => normalizeExpenses(displayedGroup, members), [displayedGroup, members]);
+  const detailsSummary = displayedGroup?.summary || null;
+  const detailsMe = displayedGroup?.me || null;
+  const detailsGroupInfo = displayedGroup?.group || null;
+  const isGroupOwner = useMemo(() => {
+    if (!selectedGroupId) return false;
+    if (detailsMe?.role === "OWNER") return true;
+    return Boolean(detailsGroupInfo?.createdBy && detailsGroupInfo.createdBy === currentId);
+  }, [selectedGroupId, detailsMe, detailsGroupInfo, currentId]);
+  const effectiveMemberCount = members.length || (selectedGroupId ? 1 : 0);
+  const effectiveMyRole = detailsMe?.role || (selectedGroupId ? "MEMBER" : "-");
+  const displayMembers = useMemo(() => {
+    if (members.length) return members;
+    if (!selectedGroupId) return [];
+    return [{
+      id: currentId,
+      name: currentName,
+      email: currentEmail,
+      role: effectiveMyRole,
+      joinedAt: null,
+      netBalanceCents: null
+    }];
+  }, [members, selectedGroupId, currentId, currentName, currentEmail, effectiveMyRole]);
+  const totalExpense = useMemo(() => {
+    if (typeof detailsSummary?.totalExpenseAmountCents === "number") {
+      return detailsSummary.totalExpenseAmountCents / 100;
+    }
+    return expenses.reduce((sum, expense) => sum + toNumberAmount(expense.amount), 0);
+  }, [detailsSummary, expenses]);
+  const expenseCount = typeof detailsSummary?.expenseCount === "number" ? detailsSummary.expenseCount : expenses.length;
 
   async function loadSessionData() {
     const meData = await meApi.fetchMe();
@@ -72,17 +98,30 @@ export default function App() {
     });
   }
 
-  async function loadGroupDetail(groupId) {
+  async function loadGroupDetail(groupId, options = {}) {
     if (!groupId) return;
+    const force = options.force === true;
+    if (!force && groupDetailStatusById[groupId] === 403) return;
     setGroupLoading(true);
     setGroupError("");
 
     try {
       const detail = await groupsApi.details(groupId);
       setGroupDetail(detail);
+      setGroupDetailStatusById((prev) => {
+        if (!(groupId in prev)) return prev;
+        const next = { ...prev };
+        delete next[groupId];
+        return next;
+      });
     } catch (err) {
       setGroupDetail(null);
-      setGroupError(err.message || "Group details are currently unavailable.");
+      const status = err?.status ? ` (HTTP ${err.status})` : "";
+      const message = err?.status === 403
+        ? "Group details endpoint is forbidden by the API for this user/group."
+        : (err.message || "Group details are currently unavailable.");
+      setGroupError(`${message}${status}`);
+      setGroupDetailStatusById((prev) => ({ ...prev, [groupId]: err?.status || -1 }));
     } finally {
       setGroupLoading(false);
     }
@@ -112,7 +151,7 @@ export default function App() {
   useEffect(() => {
     if (activeView !== "group" || !selectedGroupId) return;
 
-    if (groupDetail && groupDetail.id === selectedGroupId) return;
+    if (groupDetail && (groupDetail.group?.id === selectedGroupId || groupDetail.id === selectedGroupId)) return;
     loadGroupDetail(selectedGroupId);
   }, [activeView, selectedGroupId, groupDetail]);
 
@@ -268,6 +307,43 @@ export default function App() {
       await loadGroupDetail(selectedGroupId);
     } catch (err) {
       setError(err.message || "Could not add expense.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDeleteGroup() {
+    if (!selectedGroupId) return;
+    if (!isGroupOwner) {
+      setError("Only the group owner can delete this group.");
+      return;
+    }
+
+    const confirmed = window.confirm("Delete this group permanently? This cannot be undone.");
+    if (!confirmed) return;
+
+    setError("");
+    setSuccess("");
+    setBusy(true);
+    try {
+      await groupsApi.delete(selectedGroupId);
+      const deletedId = selectedGroupId;
+      const remaining = groups.filter((group) => group.id !== deletedId);
+      setGroups(remaining);
+      setSelectedGroupId((remaining[0] && remaining[0].id) || "");
+      setGroupDetail(null);
+      setGroupError("");
+      setInviteResult(null);
+      setGroupDetailStatusById((prev) => {
+        if (!(deletedId in prev)) return prev;
+        const next = { ...prev };
+        delete next[deletedId];
+        return next;
+      });
+      setActiveView("dashboard");
+      setSuccess("Group deleted.");
+    } catch (err) {
+      setError(err.message || "Could not delete group.");
     } finally {
       setBusy(false);
     }
@@ -536,10 +612,19 @@ export default function App() {
                   <button
                     className="btn-secondary"
                     type="button"
-                    onClick={() => loadGroupDetail(selectedGroupId)}
+                    onClick={() => loadGroupDetail(selectedGroupId, { force: true })}
                     disabled={!selectedGroupId || groupLoading}
                   >
                     {groupLoading ? "Refreshing..." : "Refresh"}
+                  </button>
+                  <button
+                    className="btn-danger"
+                    type="button"
+                    onClick={onDeleteGroup}
+                    disabled={busy || groupLoading || !selectedGroupId || !isGroupOwner}
+                    title={isGroupOwner ? "Delete this group" : "Only the group owner can delete this group"}
+                  >
+                    Delete Group
                   </button>
                   <button className="btn-ghost" type="button" onClick={onLogout} disabled={busy}>
                     Logout
@@ -548,13 +633,19 @@ export default function App() {
               </div>
 
               <div className="group-hero">
-                <h2>{displayedGroup?.name || "Group"}</h2>
+                <h2>{detailsGroupInfo?.name || displayedGroup?.name || "Group"}</h2>
                 <p>Track members and expenses in one place.</p>
                 <div className="chip-row">
-                  <span className="chip chip-soft">ID: {selectedGroupId || "-"}</span>
-                  <span className="chip chip-soft">Members: {members.length}</span>
-                  <span className="chip chip-soft">Expenses: {expenses.length}</span>
+                  <span className="chip chip-soft">ID: {detailsGroupInfo?.id || selectedGroupId || "-"}</span>
+                  <span className="chip chip-soft">Members: {effectiveMemberCount}</span>
+                  <span className="chip chip-soft">Expenses: {expenseCount}</span>
                   <span className="chip chip-soft">Total: {formatMoney(totalExpense)}</span>
+                  <span className="chip chip-soft">My Role: {effectiveMyRole}</span>
+                  <span className="chip chip-soft">My Net: {formatMoney((detailsMe?.netBalanceCents || 0) / 100)}</span>
+                </div>
+                <div className="chip-row">
+                  <span className="chip chip-soft">Created: {formatDate(detailsGroupInfo?.createdAt)}</span>
+                  <span className="chip chip-soft">Owner ID: {detailsGroupInfo?.createdBy || "-"}</span>
                 </div>
               </div>
 
@@ -566,14 +657,21 @@ export default function App() {
                 <div className="group-grid">
                   <article className="card panel section-panel">
                     <h3>Members</h3>
-                    {members.length ? (
+                    {displayMembers.length ? (
                       <ul className="member-list">
-                        {members.map((member, index) => (
+                        {displayMembers.map((member, index) => (
                           <li key={member.id || `${member.name}-${index}`}>
                             <div className="avatar">{initials(member.name)}</div>
                             <div>
                               <strong>{member.name}</strong>
                               <p>{member.email || "No email on record"}</p>
+                              <p>
+                                {member.role || "MEMBER"}
+                                {member.joinedAt ? ` • Joined ${formatDate(member.joinedAt)}` : ""}
+                                {typeof member.netBalanceCents === "number"
+                                  ? ` • Net ${formatMoney(member.netBalanceCents / 100)}`
+                                  : ""}
+                              </p>
                             </div>
                           </li>
                         ))}
@@ -639,6 +737,13 @@ export default function App() {
                                   Paid by {expense.paidBy || "Unknown"}
                                   {expense.createdAt ? ` • ${formatDate(expense.createdAt)}` : ""}
                                 </p>
+                                {expense.splits?.length ? (
+                                  <p>
+                                    Split: {expense.splits.map((split) => (
+                                      `${split.userDisplayName}: ${formatMoney((split.amountOwedCents || 0) / 100)}`
+                                    )).join(", ")}
+                                  </p>
+                                ) : null}
                               </div>
                               <span>{formatMoney(expense.amount, expense.currency)}</span>
                             </li>
@@ -687,23 +792,40 @@ function normalizeMembers(group) {
     return {
       id: member.id || member.userId || `member-${index}`,
       name: member.displayName || member.name || member.email || "Unnamed member",
-      email: member.email || ""
+      email: member.email || "",
+      role: member.role || "",
+      joinedAt: member.joinedAt || null,
+      netBalanceCents: typeof member.netBalanceCents === "number" ? member.netBalanceCents : null
     };
   });
 }
 
-function normalizeExpenses(group) {
+function normalizeExpenses(group, members) {
   if (!group) return [];
   const rawExpenses = group.expenses || group.items || group.transactions || [];
+  const memberMap = new Map((members || []).map((member) => [member.id, member]));
 
-  return rawExpenses.map((expense, index) => ({
-    id: expense.id || `expense-${index}`,
-    description: expense.description || expense.title || "Expense",
-    amount: expense.amount,
-    currency: expense.currency || "USD",
-    paidBy: expense.paidBy || expense.payerName || expense.payer?.displayName || "Unknown",
-    createdAt: expense.createdAt || expense.date || null
-  }));
+  return rawExpenses.map((expense, index) => {
+    const payerUserId = expense.payerUserId || expense.payer?.id || null;
+    const payerMember = payerUserId ? memberMap.get(payerUserId) : null;
+
+    return {
+      id: expense.id || `expense-${index}`,
+      description: expense.description || expense.title || "Expense",
+      amount: expense.amount ?? expense.amountCents,
+      currency: expense.currency || "USD",
+      payerUserId,
+      paidBy: expense.paidBy || expense.payerName || payerMember?.name || expense.payer?.displayName || "Unknown",
+      createdAt: expense.createdAt || expense.date || null,
+      splits: (expense.splits || []).map((split) => {
+        const member = memberMap.get(split.userId);
+        return {
+          ...split,
+          userDisplayName: member?.name || split.userId
+        };
+      })
+    };
+  });
 }
 
 function initials(name) {

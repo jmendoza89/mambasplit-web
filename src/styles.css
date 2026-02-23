@@ -237,6 +237,11 @@ button:disabled {
   border: 1px solid rgba(2, 64, 89, 0.26);
 }
 
+.btn-danger {
+  background: linear-gradient(130deg, #c34848, #9e2f2f);
+  color: #fff4f4;
+}
+
 .auth-toggle {
   margin-top: 12px;
   font-size: 0.9rem;
