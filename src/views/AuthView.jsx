@@ -5,6 +5,7 @@ export default function AuthView({
   password,
   busy,
   onSubmitAuth,
+  onGoogleLogin,
   onToggleAuthMode,
   setDisplayName,
   setEmail,
@@ -68,6 +69,12 @@ export default function AuthView({
             </button>
           </div>
         </form>
+        <div className="actions">
+          <button type="button" className="btn-secondary" onClick={onGoogleLogin} disabled={busy}>
+            {authMode === "login" ? "Sign in with Google" : "Sign up with Google"}
+          </button>
+        </div>
+        <p className="auth-hint">Use Google to sign in, or create an account automatically if you are new.</p>
 
         <p className="auth-toggle">
           {authMode === "login" ? "No account? " : "Already registered? "}

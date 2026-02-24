@@ -7,6 +7,10 @@ export async function submitAuth(authMode, email, password, displayName) {
   return authApi.signup(email.trim(), password, displayName.trim());
 }
 
+export async function submitGoogleAuth(idToken) {
+  return authApi.googleLogin(idToken);
+}
+
 export const authService = {
   logout: authApi.logout
 };

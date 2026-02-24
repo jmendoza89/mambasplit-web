@@ -122,6 +122,7 @@ export const authApi = {
   login: (email, password) => api("/api/v1/auth/login", "POST", { email, password }, false),
   signup: (email, password, displayName) =>
     api("/api/v1/auth/signup", "POST", { email, password, displayName }, false),
+  googleLogin: (idToken) => api("/api/v1/auth/google", "POST", { idToken }, false),
   logout: async () => {
     const refreshToken = getRefreshToken();
     if (!refreshToken) return;
