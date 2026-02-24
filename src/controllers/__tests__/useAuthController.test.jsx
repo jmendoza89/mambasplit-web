@@ -12,6 +12,7 @@ vi.mock("../../services", () => ({
   authService: {
     logout: vi.fn()
   },
+  submitGoogleAuth: vi.fn(),
   submitAuth: vi.fn(async () => ({
     accessToken: "token",
     refreshToken: "refresh",

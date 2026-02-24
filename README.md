@@ -16,9 +16,14 @@ npm run dev
 
 Vite runs on http://localhost:5173 and proxies /api/* to http://localhost:8080.
 
+Optional environment variable for Google Sign-In:
+
+- `VITE_GOOGLE_CLIENT_ID`: OAuth client ID from Google Cloud Console
+
 ## Features ✨
 
 - Signup/Login/Logout
+- Google Sign-In (requires backend `POST /api/v1/auth/google`)
 - Profile dashboard
 - Groups list + create group
 - Create invite for selected group

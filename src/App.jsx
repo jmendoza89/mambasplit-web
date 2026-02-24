@@ -48,6 +48,7 @@ export default function App() {
             password={state.password}
             busy={state.busy}
             onSubmitAuth={actions.onSubmitAuth}
+            onGoogleLogin={actions.onGoogleLogin}
             onToggleAuthMode={actions.onToggleAuthMode}
             setDisplayName={actions.setDisplayName}
             setEmail={actions.setEmail}

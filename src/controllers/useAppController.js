@@ -152,6 +152,7 @@ export function useAppController() {
       setPassword,
       onToggleAuthMode: authController.onToggleAuthMode,
       onSubmitAuth: authController.onSubmitAuth,
+      onGoogleLogin: authController.onGoogleLogin,
       onLogout: authController.onLogout,
       onCreateGroup: dashboardController.actions.onCreateGroup,
       onCreateInvite: dashboardController.actions.onCreateInvite,
