@@ -283,6 +283,12 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.auth-hint {
+  margin: 8px 0 0;
+  color: #2c5f6b;
+  font-size: 0.85rem;
+}
+
 .auth-toggle a {
   color: var(--ink-900);
   font-weight: 700;
@@ -617,6 +623,18 @@ button:disabled {
   margin: 4px 0 0;
   color: #2c5f6b;
   font-size: 0.9rem;
+}
+
+.expense-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.expense-actions .btn-inline {
+  margin-right: 0;
+  padding: 6px 10px;
 }
 
 .avatar {

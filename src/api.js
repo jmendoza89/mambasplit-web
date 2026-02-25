@@ -122,6 +122,7 @@ export const authApi = {
   login: (email, password) => api("/api/v1/auth/login", "POST", { email, password }, false),
   signup: (email, password, displayName) =>
     api("/api/v1/auth/signup", "POST", { email, password, displayName }, false),
+  googleLogin: (idToken) => api("/api/v1/auth/google", "POST", { idToken }, false),
   logout: async () => {
     const refreshToken = getRefreshToken();
     if (!refreshToken) return;
@@ -159,6 +160,7 @@ export const groupsApi = {
     }
   },
   createEqualExpense: (groupId, payload) => api(`/api/v1/groups/${groupId}/expenses/equal`, "POST", payload),
+  deleteExpense: (groupId, expenseId) => api(`/api/v1/groups/${groupId}/expenses/${expenseId}`, "DELETE"),
   createInvite: (groupId, email) => api(`/api/v1/groups/${groupId}/invites`, "POST", { email }),
   acceptInvite: (token) => api("/api/v1/invites/accept", "POST", { token })
 };

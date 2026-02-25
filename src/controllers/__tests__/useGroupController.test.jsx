@@ -10,6 +10,7 @@ vi.mock("../../services", () => ({
       expenses: []
     })),
     createEqualExpense: vi.fn(async () => {}),
+    deleteExpense: vi.fn(async () => {}),
     delete: vi.fn(async () => {})
   }
 }));
@@ -53,5 +54,51 @@ describe("useGroupController", () => {
     });
 
     expect(setError).toHaveBeenCalledWith("Could not determine current user id for payer.");
+  });
+
+  it("deletes an expense owned by the current user", async () => {
+    const setGroupError = vi.fn();
+    const setError = vi.fn();
+    const setSuccess = vi.fn();
+    const setBusy = vi.fn();
+
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    const { result } = renderHook(() =>
+      useGroupController({
+        activeView: "dashboard",
+        setActiveView: vi.fn(),
+        groups: [{
+          id: "group-1",
+          name: "Trip",
+          expenses: [{
+            id: "expense-1",
+            description: "Dinner",
+            amountCents: 1000,
+            payerUserId: "00000000-0000-4000-8000-000000000001"
+          }]
+        }],
+        setGroups: vi.fn(),
+        selectedGroupId: "group-1",
+        setSelectedGroupId: vi.fn(),
+        groupDetail: null,
+        setGroupDetail: vi.fn(),
+        groupDetailStatusById: {},
+        setGroupDetailStatusById: vi.fn(),
+        setGroupError,
+        setError,
+        setSuccess,
+        setBusy,
+        currentId: "00000000-0000-4000-8000-000000000001",
+        currentName: "User",
+        currentEmail: "u@example.com"
+      })
+    );
+
+    await act(async () => {
+      await result.current.actions.onDeleteExpense("expense-1");
+    });
+
+    expect(setSuccess).toHaveBeenCalledWith("Expense deleted.");
   });
 });

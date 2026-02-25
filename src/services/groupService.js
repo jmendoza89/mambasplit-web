@@ -13,5 +13,6 @@ export const groupService = {
   delete: groupsApi.delete,
   createInvite: groupsApi.createInvite,
   acceptInvite: groupsApi.acceptInvite,
-  createEqualExpense: groupsApi.createEqualExpense
+  createEqualExpense: groupsApi.createEqualExpense,
+  deleteExpense: groupsApi.deleteExpense
 };

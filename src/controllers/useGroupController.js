@@ -261,6 +261,31 @@ export function useGroupController({
     }
   }
 
+  async function onDeleteExpense(expenseId) {
+    if (!selectedGroupId || !expenseId) return;
+    const expense = expenses.find((item) => item.id === expenseId);
+    if (expense?.payerUserId && expense.payerUserId !== currentId) {
+      setError("Only the expense owner can delete this expense.");
+      return;
+    }
+
+    const confirmed = window.confirm("Delete this expense permanently? This cannot be undone.");
+    if (!confirmed) return;
+
+    setError("");
+    setSuccess("");
+    setBusy(true);
+    try {
+      await groupService.deleteExpense(selectedGroupId, expenseId);
+      await loadGroupDetail(selectedGroupId, { force: true });
+      setSuccess("Expense deleted.");
+    } catch (err) {
+      setError(err.message || "Could not delete expense.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function onResetGroupState() {
     setExpenseDescription("");
     setExpenseAmount("");
@@ -298,6 +323,7 @@ export function useGroupController({
       onExpenseDescriptionKeyDown,
       onOpenExpenseModal,
       onCloseExpenseModal,
+      onDeleteExpense,
       onDeleteGroup,
       onRefreshGroupDetail: () => loadGroupDetail(selectedGroupId, { force: true }),
       setExpenseDescription,
