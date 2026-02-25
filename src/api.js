@@ -160,6 +160,7 @@ export const groupsApi = {
     }
   },
   createEqualExpense: (groupId, payload) => api(`/api/v1/groups/${groupId}/expenses/equal`, "POST", payload),
+  deleteExpense: (groupId, expenseId) => api(`/api/v1/groups/${groupId}/expenses/${expenseId}`, "DELETE"),
   createInvite: (groupId, email) => api(`/api/v1/groups/${groupId}/invites`, "POST", { email }),
   acceptInvite: (token) => api("/api/v1/invites/accept", "POST", { token })
 };

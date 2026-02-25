@@ -79,6 +79,7 @@ export default function App() {
         ) : (
           <GroupView
             selectedGroupId={state.selectedGroupId}
+            currentId={state.currentId}
             busy={state.busy}
             groupLoading={state.groupLoading}
             isGroupOwner={state.isGroupOwner}
@@ -96,6 +97,7 @@ export default function App() {
             itemVariants={itemVariants}
             onBackToDashboard={() => actions.setActiveView("dashboard")}
             onOpenExpenseModal={actions.onOpenExpenseModal}
+            onDeleteExpense={actions.onDeleteExpense}
             onRefreshGroupDetail={actions.onRefreshGroupDetail}
             onDeleteGroup={actions.onDeleteGroup}
             onLogout={actions.onLogout}

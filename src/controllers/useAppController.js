@@ -162,6 +162,7 @@ export function useAppController() {
       onExpenseDescriptionKeyDown: groupController.actions.onExpenseDescriptionKeyDown,
       onOpenExpenseModal: groupController.actions.onOpenExpenseModal,
       onCloseExpenseModal: groupController.actions.onCloseExpenseModal,
+      onDeleteExpense: groupController.actions.onDeleteExpense,
       onDeleteGroup: groupController.actions.onDeleteGroup,
       onRefreshGroupDetail: groupController.actions.onRefreshGroupDetail
     }

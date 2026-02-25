@@ -3,6 +3,7 @@ import { formatDate, formatMoney, initials } from "../utils/formatters";
 
 export default function GroupView({
   selectedGroupId,
+  currentId,
   busy,
   groupLoading,
   isGroupOwner,
@@ -20,6 +21,7 @@ export default function GroupView({
   itemVariants,
   onBackToDashboard,
   onOpenExpenseModal,
+  onDeleteExpense,
   onRefreshGroupDetail,
   onDeleteGroup,
   onLogout
@@ -169,7 +171,28 @@ export default function GroupView({
                             </p>
                           ) : null}
                         </div>
-                        <span>{formatMoney(expense.amount, expense.currency)}</span>
+                        <div className="expense-actions">
+                          <span>{formatMoney(expense.amount, expense.currency)}</span>
+                          <button
+                            className="btn-danger btn-inline"
+                            type="button"
+                            onClick={() => onDeleteExpense(expense.id)}
+                            disabled={
+                              busy
+                              || groupLoading
+                              || !expense.id
+                              || !expense.payerUserId
+                              || expense.payerUserId !== currentId
+                            }
+                            title={
+                              expense.payerUserId === currentId
+                                ? "Delete this expense"
+                                : "Only the expense owner can delete this expense"
+                            }
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </motion.li>
                     ))}
                   </motion.ul>
