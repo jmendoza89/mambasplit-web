@@ -63,18 +63,23 @@ export default function App() {
             groups={state.groups}
             newGroupName={state.newGroupName}
             inviteEmail={state.inviteEmail}
-            acceptToken={state.acceptToken}
             inviteResult={state.inviteResult}
+            sentInvites={state.sentInvites}
+            pendingInvites={state.pendingInvites}
+            pendingInvitesLoading={state.pendingInvitesLoading}
+            pendingInvitesError={state.pendingInvitesError}
+            groupOwnershipById={state.groupOwnershipById}
             busy={state.busy}
             onOpenGroupPage={actions.onOpenGroupPage}
             onLogout={actions.onLogout}
             onCreateGroup={actions.onCreateGroup}
             onCreateInvite={actions.onCreateInvite}
-            onAcceptInvite={actions.onAcceptInvite}
+            onAcceptPendingInvite={actions.onAcceptPendingInvite}
+            onDeleteInvite={actions.onDeleteInvite}
+            onRefreshPendingInvites={actions.onRefreshPendingInvites}
             setSelectedGroupId={actions.setSelectedGroupId}
             setNewGroupName={actions.setNewGroupName}
             setInviteEmail={actions.setInviteEmail}
-            setAcceptToken={actions.setAcceptToken}
           />
         ) : (
           <GroupView

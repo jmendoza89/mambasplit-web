@@ -377,6 +377,20 @@ button:disabled {
   letter-spacing: 0.9px;
 }
 
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.panel-header-placeholder {
+  width: 84px;
+  height: 36px;
+  display: inline-block;
+}
+
 .section-panel {
   background: linear-gradient(180deg, rgba(252, 254, 255, 0.84), rgba(241, 249, 251, 0.92));
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
@@ -386,6 +400,21 @@ button:disabled {
   transform: translateY(-3px);
   box-shadow: 0 18px 32px rgba(2, 64, 89, 0.2);
   border-color: rgba(2, 64, 89, 0.28);
+}
+
+.invites-panel {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.create-invite-panel {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.pending-invites-panel {
+  grid-column: 1;
+  grid-row: 2;
 }
 
 .inline-form {
@@ -440,6 +469,43 @@ button:disabled {
   font-weight: 700;
 }
 
+.group-name-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.group-role-chip {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.group-list li.group-owner {
+  border-color: rgba(17, 111, 83, 0.32);
+}
+
+.group-list li.group-member {
+  border-color: rgba(2, 64, 89, 0.18);
+}
+
+.group-list li.group-owner .chip-owner {
+  color: #0f5f47;
+  background: rgba(96, 222, 172, 0.26);
+  border-color: rgba(17, 111, 83, 0.28);
+}
+
+.group-list li.group-member .chip-member {
+  color: #245364;
+  background: rgba(2, 64, 89, 0.1);
+  border-color: rgba(2, 64, 89, 0.2);
+}
+
 .btn-inline {
   margin-right: 8px;
   background: rgba(2, 64, 89, 0.12);
@@ -451,6 +517,14 @@ button:disabled {
   padding: 12px;
   color: #3f6d78;
   font-weight: 600;
+}
+
+.list-empty-inline {
+  margin: 0;
+  border: 1px solid rgba(2, 64, 89, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-sm);
 }
 
 .result-box {
@@ -670,6 +744,21 @@ button:disabled {
 @media (max-width: 980px) {
   .workspace-grid {
     grid-template-columns: 1fr;
+  }
+
+  .invites-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .create-invite-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .pending-invites-panel {
+    grid-column: auto;
+    grid-row: auto;
   }
 }
 
