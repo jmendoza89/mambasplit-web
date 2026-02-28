@@ -1,7 +1,8 @@
+import { useAlerts } from "../contexts/AlertContext";
+import { useAuth } from "../contexts/AuthContext";
+import { isGroupOwner as checkGroupOwnership } from "../utils/groupOwnership";
+
 export default function DashboardView({
-  currentName,
-  currentEmail,
-  currentId,
   selectedGroupId,
   groups,
   newGroupName,
@@ -12,9 +13,7 @@ export default function DashboardView({
   pendingInvitesLoading,
   pendingInvitesError,
   groupOwnershipById = {},
-  busy,
   onOpenGroupPage,
-  onLogout,
   onCreateGroup,
   onCreateInvite,
   onAcceptPendingInvite,
@@ -24,6 +23,8 @@ export default function DashboardView({
   setNewGroupName,
   setInviteEmail
 }) {
+  const { currentName, currentEmail, currentId, onLogout } = useAuth();
+  const { busy } = useAlerts();
   function formatTimestamp(value) {
     if (!value) return "-";
     const parsed = new Date(value);
@@ -32,52 +33,7 @@ export default function DashboardView({
   }
 
   function isOwnedGroup(group) {
-    if (!group) return false;
-    if (group.id && groupOwnershipById[group.id] === true) return true;
-    if (group.id && groupOwnershipById[group.id] === false) return false;
-    if (group.isOwner === true || group.owner === true) return true;
-
-    const currentIdNormalized = String(currentId || "").trim().toLowerCase();
-    const ownerIdCandidates = [
-      group.createdBy,
-      group.createdById,
-      group.createdByUserId,
-      group.ownerId,
-      group.ownerUserId,
-      group.owner?.id,
-      group.createdBy?.id
-    ];
-    if (
-      currentIdNormalized &&
-      ownerIdCandidates.some((ownerId) => String(ownerId || "").trim().toLowerCase() === currentIdNormalized)
-    ) {
-      return true;
-    }
-
-    const roleCandidates = [
-      group.role,
-      group.userRole,
-      group.myRole,
-      group.me?.role,
-      group.membership?.role
-    ];
-    if (roleCandidates.some((role) => String(role || "").trim().toUpperCase() === "OWNER")) return true;
-
-    const currentEmailNormalized = String(currentEmail || "").trim().toLowerCase();
-    const ownerEmailCandidates = [
-      group.createdByEmail,
-      group.ownerEmail,
-      group.owner?.email,
-      group.createdBy?.email
-    ];
-    if (
-      currentEmailNormalized &&
-      ownerEmailCandidates.some((ownerEmail) => String(ownerEmail || "").trim().toLowerCase() === currentEmailNormalized)
-    ) {
-      return true;
-    }
-
-    return false;
+    return checkGroupOwnership(group, currentId, currentEmail, groupOwnershipById);
   }
 
   return (

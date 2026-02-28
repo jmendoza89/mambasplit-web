@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildExpenseParticipants,
   findSelectedGroup,
-  isValidExpenseAmount,
   normalizeExpenses,
   normalizeMembers,
   selectDisplayedGroup
 } from "../models";
 import { groupService } from "../services";
 import { isUuid, toNumberAmount } from "../utils/formatters";
+import { validateExpenseAmount, validateExpenseDescription, validateFields } from "../utils/validation";
 
 export function useGroupController({
   activeView,
@@ -148,16 +148,28 @@ export function useGroupController({
 
   async function onCreateExpense(e) {
     if (e) e.preventDefault();
-    if (!selectedGroupId || !expenseDescription.trim() || !expenseAmount.trim()) return;
+    
+    // Validate all inputs
+    const validationError = validateFields([
+      validateExpenseDescription(expenseDescription),
+      validateExpenseAmount(expenseAmount)
+    ]);
+    
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    if (!selectedGroupId) {
+      setError("No group selected.");
+      return;
+    }
+
     if (!isUuid(currentId)) {
       setError("Could not determine current user id for payer.");
       return;
     }
 
-    if (!isValidExpenseAmount(expenseAmount)) {
-      setError("Amount must be greater than zero.");
-      return;
-    }
     const numericAmount = Number(expenseAmount);
 
     const participants = buildExpenseParticipants(members, currentId);

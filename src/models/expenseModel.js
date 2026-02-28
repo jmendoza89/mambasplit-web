@@ -1,4 +1,5 @@
 import { isUuid } from "../utils/formatters";
+import { isValidExpenseAmount as validateAmount } from "../utils/validation";
 
 export function normalizeExpenses(group, members) {
   if (!group) return [];
@@ -42,6 +43,5 @@ export function buildExpenseParticipants(groupMembers, payerId) {
 }
 
 export function isValidExpenseAmount(amountText) {
-  const numericAmount = Number(amountText);
-  return Number.isFinite(numericAmount) && numericAmount > 0;
+  return validateAmount(amountText);
 }

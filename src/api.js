@@ -1,4 +1,6 @@
-﻿const STORAGE_KEYS = {
+﻿import { ApiError, createErrorFromResponse } from "./utils/apiError";
+
+const STORAGE_KEYS = {
   access: "mambasplit_access_token",
   refresh: "mambasplit_refresh_token",
   user: "mambasplit_user"
@@ -69,9 +71,7 @@ async function refreshAccessToken() {
     const response = await request("/api/v1/auth/refresh", "POST", { refreshToken }, false);
     if (!response.ok) {
       clearSession();
-      const err = new Error("Session expired.");
-      err.status = response.status;
-      throw err;
+      throw await createErrorFromResponse(response, "Session expired");
     }
 
     const data = await response.json();
@@ -109,10 +109,7 @@ export async function api(path, method = "GET", body = null, auth = true) {
   }
 
   if (!response.ok) {
-    const message = (data && data.message) || `Request failed (${response.status}).`;
-    const err = new Error(message);
-    err.status = response.status;
-    throw err;
+    throw await createErrorFromResponse(response, "Request failed");
   }
 
   return data;
@@ -139,24 +136,34 @@ export const groupsApi = {
   create: (name) => api("/api/v1/groups", "POST", { name }),
   delete: (groupId) => api(`/api/v1/groups/${groupId}`, "DELETE"),
   details: async (groupId) => {
-    let firstError = null;
+    // Try the detailed endpoint first (includes balances, splits, etc.)
+    // Falls back to basic endpoint if detailed is not available
     try {
       return await api(`/api/v1/groups/${groupId}/details`);
     } catch (err) {
-      firstError = err;
-      // If auth fails, bubbling immediately is clearer than attempting fallback.
-      if (err.status === 401 || err.status === 403) throw err;
-    }
-
-    try {
-      return await api(`/api/v1/groups/${groupId}`);
-    } catch (fallbackErr) {
-      if (fallbackErr.status === 401 || fallbackErr.status === 403) throw fallbackErr;
-      const combined = new Error(
-        `Group details failed (details: ${firstError?.status || "?"}, fallback: ${fallbackErr?.status || "?"}).`
-      );
-      combined.status = fallbackErr.status || firstError?.status;
-      throw combined;
+      // If auth fails on details endpoint, bubble immediately
+      if (err instanceof ApiError && err.isAuthError()) {
+        throw err;
+      }
+      
+      // Try basic endpoint as fallback
+      try {
+        return await api(`/api/v1/groups/${groupId}`);
+      } catch (fallbackErr) {
+        // If fallback also fails with auth error, bubble it
+        if (fallbackErr instanceof ApiError && fallbackErr.isAuthError()) {
+          throw fallbackErr;
+        }
+        
+        // Both endpoints failed - throw combined error with status info
+        const detailStatus = err instanceof ApiError ? err.status : "unknown";
+        const fallbackStatus = fallbackErr instanceof ApiError ? fallbackErr.status : "unknown";
+        throw new ApiError(
+          `Unable to load group details (details: ${detailStatus}, basic: ${fallbackStatus})`,
+          fallbackErr instanceof ApiError ? fallbackErr.status : 500,
+          { detailError: err, fallbackError: fallbackErr }
+        );
+      }
     }
   },
   createEqualExpense: (groupId, payload) => api(`/api/v1/groups/${groupId}/expenses/equal`, "POST", payload),
