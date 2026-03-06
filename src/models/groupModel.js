@@ -1,3 +1,5 @@
+import { isValidGroupName as validateName } from "../utils/validation";
+
 export function findSelectedGroup(groups, selectedGroupId) {
   return groups.find((group) => group.id === selectedGroupId) || null;
 }
@@ -10,5 +12,5 @@ export function selectDisplayedGroup(selectedGroupId, selectedGroup, groupDetail
 }
 
 export function isValidGroupName(value) {
-  return typeof value === "string" && value.trim().length > 0;
+  return validateName(value);
 }

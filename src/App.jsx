@@ -1,4 +1,7 @@
 import { motion } from "motion/react";
+import { useMemo } from "react";
+import { AlertContext } from "./contexts/AlertContext";
+import { AuthContext } from "./contexts/AuthContext";
 import { useAppController } from "./controllers/useAppController";
 import AuthView from "./views/AuthView";
 import DashboardView from "./views/DashboardView";
@@ -10,6 +13,57 @@ import Header from "./views/components/Header";
 
 export default function App() {
   const { state, actions, refs } = useAppController();
+
+  // Memoize context values to prevent unnecessary re-renders
+  const authContextValue = useMemo(() => ({
+    user: state.user,
+    me: state.me,
+    isAuthenticated: state.isAuthenticated,
+    currentName: state.currentName,
+    currentEmail: state.currentEmail,
+    currentId: state.currentId,
+    authMode: state.authMode,
+    email: state.email,
+    password: state.password,
+    displayName: state.displayName,
+    setAuthMode: actions.setAuthMode,
+    setEmail: actions.setEmail,
+    setPassword: actions.setPassword,
+    setDisplayName: actions.setDisplayName,
+    onSubmitAuth: actions.onSubmitAuth,
+    onGoogleLogin: actions.onGoogleLogin,
+    onLogout: actions.onLogout,
+    onToggleAuthMode: actions.onToggleAuthMode
+  }), [
+    state.user,
+    state.me,
+    state.isAuthenticated,
+    state.currentName,
+    state.currentEmail,
+    state.currentId,
+    state.authMode,
+    state.email,
+    state.password,
+    state.displayName,
+    actions.setAuthMode,
+    actions.setEmail,
+    actions.setPassword,
+    actions.setDisplayName,
+    actions.onSubmitAuth,
+    actions.onGoogleLogin,
+    actions.onLogout,
+    actions.onToggleAuthMode
+  ]);
+
+  const alertContextValue = useMemo(() => ({
+    error: state.error,
+    success: state.success,
+    busy: state.busy,
+    setError: () => { /* handled in controller */ },
+    setSuccess: () => { /* handled in controller */ },
+    setBusy: () => { /* handled in controller */ },
+    clearAlerts: () => { /* handled in controller */ }
+  }), [state.error, state.success, state.busy]);
 
   if (state.loading) {
     return (
@@ -26,35 +80,24 @@ export default function App() {
   }
 
   return (
-    <>
-      <div className="page-bg" />
-      <div className="orb orb-a" />
-      <div className="orb orb-b" />
+    <AuthContext.Provider value={authContextValue}>
+      <AlertContext.Provider value={alertContextValue}>
+        <div className="page-bg" />
+        <div className="orb orb-a" />
+        <div className="orb orb-b" />
 
-      <motion.main
-        className="app-shell"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-      >
-        <Header />
-        <Alerts error={state.error} success={state.success} />
+        <motion.main
+          className="app-shell"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <Header />
+          <Alerts error={state.error} success={state.success} />
 
-        {!state.isAuthenticated ? (
-          <AuthView
-            authMode={state.authMode}
-            displayName={state.displayName}
-            email={state.email}
-            password={state.password}
-            busy={state.busy}
-            onSubmitAuth={actions.onSubmitAuth}
-            onGoogleLogin={actions.onGoogleLogin}
-            onToggleAuthMode={actions.onToggleAuthMode}
-            setDisplayName={actions.setDisplayName}
-            setEmail={actions.setEmail}
-            setPassword={actions.setPassword}
-          />
-        ) : state.activeView === "dashboard" ? (
+          {!state.isAuthenticated ? (
+            <AuthView />
+          ) : state.activeView === "dashboard" ? (
           <DashboardView
             currentName={state.currentName}
             currentEmail={state.currentEmail}
@@ -69,9 +112,7 @@ export default function App() {
             pendingInvitesLoading={state.pendingInvitesLoading}
             pendingInvitesError={state.pendingInvitesError}
             groupOwnershipById={state.groupOwnershipById}
-            busy={state.busy}
             onOpenGroupPage={actions.onOpenGroupPage}
-            onLogout={actions.onLogout}
             onCreateGroup={actions.onCreateGroup}
             onCreateInvite={actions.onCreateInvite}
             onAcceptPendingInvite={actions.onAcceptPendingInvite}
@@ -84,8 +125,6 @@ export default function App() {
         ) : (
           <GroupView
             selectedGroupId={state.selectedGroupId}
-            currentId={state.currentId}
-            busy={state.busy}
             groupLoading={state.groupLoading}
             isGroupOwner={state.isGroupOwner}
             displayedGroup={state.displayedGroup}
@@ -105,7 +144,6 @@ export default function App() {
             onDeleteExpense={actions.onDeleteExpense}
             onRefreshGroupDetail={actions.onRefreshGroupDetail}
             onDeleteGroup={actions.onDeleteGroup}
-            onLogout={actions.onLogout}
           />
         )}
       </motion.main>
@@ -115,7 +153,6 @@ export default function App() {
         expenseDescription={state.expenseDescription}
         expenseAmount={state.expenseAmount}
         expenseSavedStatus={state.expenseSavedStatus}
-        busy={state.busy}
         groupLoading={state.groupLoading}
         selectedGroupId={state.selectedGroupId}
         expenseDescriptionRef={refs.expenseDescriptionRef}
@@ -126,6 +163,7 @@ export default function App() {
         setExpenseDescription={actions.setExpenseDescription}
         setExpenseAmount={actions.setExpenseAmount}
       />
-    </>
+    </AlertContext.Provider>
+    </AuthContext.Provider>
   );
 }

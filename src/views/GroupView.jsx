@@ -1,10 +1,10 @@
 import { motion } from "motion/react";
+import { useAlerts } from "../contexts/AlertContext";
+import { useAuth } from "../contexts/AuthContext";
 import { formatDate, formatMoney, initials } from "../utils/formatters";
 
 export default function GroupView({
   selectedGroupId,
-  currentId,
-  busy,
   groupLoading,
   isGroupOwner,
   displayedGroup,
@@ -23,9 +23,10 @@ export default function GroupView({
   onOpenExpenseModal,
   onDeleteExpense,
   onRefreshGroupDetail,
-  onDeleteGroup,
-  onLogout
+  onDeleteGroup
 }) {
+  const { currentId, onLogout } = useAuth();
+  const { busy } = useAlerts();
   return (
     <section className="dash-wrap">
       <article className="card panel">

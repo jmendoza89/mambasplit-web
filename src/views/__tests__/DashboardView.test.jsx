@@ -1,13 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { AlertContext } from "../../contexts/AlertContext";
+import { AuthContext } from "../../contexts/AuthContext";
 import DashboardView from "../DashboardView";
 
-function renderView(overrideProps = {}) {
+function renderView(overrideProps = {}, contextOverrides = {}) {
   cleanup();
   const props = {
-    currentName: "User",
-    currentEmail: "u@example.com",
-    currentId: "00000000-0000-4000-8000-000000000001",
     selectedGroupId: "",
     groups: [],
     newGroupName: "",
@@ -17,9 +16,8 @@ function renderView(overrideProps = {}) {
     pendingInvites: [],
     pendingInvitesLoading: false,
     pendingInvitesError: "",
-    busy: false,
+    groupOwnershipById: {},
     onOpenGroupPage: vi.fn(),
-    onLogout: vi.fn(),
     onCreateGroup: vi.fn((e) => e.preventDefault()),
     onCreateInvite: vi.fn((e) => e.preventDefault()),
     onAcceptPendingInvite: vi.fn(),
@@ -31,8 +29,34 @@ function renderView(overrideProps = {}) {
     ...overrideProps
   };
 
-  render(<DashboardView {...props} />);
-  return props;
+  const authContextValue = {
+    currentName: "User",
+    currentEmail: "u@example.com",
+    currentId: "00000000-0000-4000-8000-000000000001",
+    onLogout: vi.fn(),
+    ...contextOverrides.auth
+  };
+
+  const alertContextValue = {
+    error: "",
+    success: "",
+    busy: false,
+    setError: vi.fn(),
+    setSuccess: vi.fn(),
+    setBusy: vi.fn(),
+    clearAlerts: vi.fn(),
+    ...contextOverrides.alert
+  };
+
+  render(
+    <AuthContext.Provider value={authContextValue}>
+      <AlertContext.Provider value={alertContextValue}>
+        <DashboardView {...props} />
+      </AlertContext.Provider>
+    </AuthContext.Provider>
+  );
+  
+  return { props, authContextValue, alertContextValue };
 }
 
 describe("DashboardView", () => {
@@ -89,26 +113,34 @@ describe("DashboardView", () => {
   });
 
   it("shows owner and member chips in groups list", () => {
-    renderView({
-      currentId: "user-1",
-      groups: [
-        { id: "group-1", name: "Owned Group", createdBy: "user-1" },
-        { id: "group-2", name: "Joined Group", createdBy: "user-2" }
-      ]
-    });
+    renderView(
+      {
+        groups: [
+          { id: "group-1", name: "Owned Group", createdBy: "user-1" },
+          { id: "group-2", name: "Joined Group", createdBy: "user-2" }
+        ]
+      },
+      {
+        auth: { currentId: "user-1" }
+      }
+    );
 
     expect(screen.getByText("Owner")).toBeInTheDocument();
     expect(screen.getByText("Member")).toBeInTheDocument();
   });
 
   it("treats role and ownership flags from api payload as owner", () => {
-    renderView({
-      currentId: "user-1",
-      groups: [
-        { id: "group-1", name: "Flag Owner", isOwner: true },
-        { id: "group-2", name: "Role Owner", userRole: "owner" }
-      ]
-    });
+    renderView(
+      {
+        groups: [
+          { id: "group-1", name: "Flag Owner", isOwner: true },
+          { id: "group-2", name: "Role Owner", userRole: "owner" }
+        ]
+      },
+      {
+        auth: { currentId: "user-1" }
+      }
+    );
 
     expect(screen.getAllByText("Owner")).toHaveLength(2);
   });

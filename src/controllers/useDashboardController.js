@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { isValidGroupName } from "../models";
 import { groupService } from "../services";
+import { extractOwnershipFromDetail } from "../utils/groupOwnership";
 
 export function useDashboardController({
   groups,
@@ -31,36 +32,6 @@ export function useDashboardController({
   useEffect(() => {
     let cancelled = false;
 
-    function ownershipFromDetail(detail) {
-      if (!detail) return null;
-      const roleCandidates = [
-        detail.me?.role,
-        detail.role,
-        detail.myRole,
-        detail.membership?.role
-      ];
-      if (roleCandidates.some((role) => String(role || "").trim().toUpperCase() === "OWNER")) return true;
-
-      const currentIdNormalized = String(currentId || "").trim().toLowerCase();
-      const ownerIdCandidates = [
-        detail.group?.createdBy,
-        detail.groupInfo?.createdBy,
-        detail.createdBy,
-        detail.ownerId,
-        detail.owner?.id
-      ];
-      if (
-        currentIdNormalized &&
-        ownerIdCandidates.some((ownerId) => String(ownerId || "").trim().toLowerCase() === currentIdNormalized)
-      ) {
-        return true;
-      }
-
-      if (roleCandidates.some((role) => String(role || "").trim().length > 0)) return false;
-      if (ownerIdCandidates.some((ownerId) => String(ownerId || "").trim().length > 0)) return false;
-      return null;
-    }
-
     async function resolveOwnership() {
       if (!groups.length) {
         if (!cancelled && Object.keys(groupOwnershipById).length > 0) {
@@ -78,7 +49,7 @@ export function useDashboardController({
       const detailEntries = await Promise.all(unresolved.map(async (groupId) => {
         try {
           const detail = await groupService.details(groupId);
-          return [groupId, ownershipFromDetail(detail)];
+          return [groupId, extractOwnershipFromDetail(detail, currentId)];
         } catch {
           return [groupId, null];
         }

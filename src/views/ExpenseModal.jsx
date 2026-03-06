@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
+import { useAlerts } from "../contexts/AlertContext";
 import { formatDate, formatMoney } from "../utils/formatters";
 
 export default function ExpenseModal({
@@ -6,7 +7,6 @@ export default function ExpenseModal({
   expenseDescription,
   expenseAmount,
   expenseSavedStatus,
-  busy,
   groupLoading,
   selectedGroupId,
   expenseDescriptionRef,
@@ -17,6 +17,7 @@ export default function ExpenseModal({
   setExpenseDescription,
   setExpenseAmount
 }) {
+  const { busy } = useAlerts();
   return (
     <AnimatePresence>
       {isOpen ? (

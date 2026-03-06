@@ -1,16 +1,21 @@
-export default function AuthView({
-  authMode,
-  displayName,
-  email,
-  password,
-  busy,
-  onSubmitAuth,
-  onGoogleLogin,
-  onToggleAuthMode,
-  setDisplayName,
-  setEmail,
-  setPassword
-}) {
+import { useAlerts } from "../contexts/AlertContext";
+import { useAuth } from "../contexts/AuthContext";
+
+export default function AuthView() {
+  const {
+    authMode,
+    displayName,
+    email,
+    password,
+    onSubmitAuth,
+    onGoogleLogin,
+    onToggleAuthMode,
+    setDisplayName,
+    setEmail,
+    setPassword
+  } = useAuth();
+  
+  const { busy } = useAlerts();
   return (
     <section className="auth-wrap">
       <article className="card panel hero-panel">
