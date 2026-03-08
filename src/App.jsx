@@ -152,7 +152,12 @@ export default function App() {
         isOpen={state.isExpenseModalOpen}
         expenseDescription={state.expenseDescription}
         expenseAmount={state.expenseAmount}
+        expensePayerUserId={state.expensePayerUserId}
         expenseSavedStatus={state.expenseSavedStatus}
+        currentName={state.currentName}
+        participantCount={state.effectiveMemberCount}
+        groupName={state.detailsGroupInfo?.name || state.displayedGroup?.name || "Group"}
+        members={state.displayMembers}
         groupLoading={state.groupLoading}
         selectedGroupId={state.selectedGroupId}
         expenseDescriptionRef={refs.expenseDescriptionRef}
@@ -162,6 +167,7 @@ export default function App() {
         onExpenseDescriptionKeyDown={actions.onExpenseDescriptionKeyDown}
         setExpenseDescription={actions.setExpenseDescription}
         setExpenseAmount={actions.setExpenseAmount}
+        setExpensePayerUserId={actions.setExpensePayerUserId}
       />
     </AlertContext.Provider>
     </AuthContext.Provider>

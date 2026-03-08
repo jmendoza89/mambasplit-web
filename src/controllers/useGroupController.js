@@ -33,6 +33,7 @@ export function useGroupController({
   const [localGroupError, setLocalGroupError] = useState("");
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
+  const [expensePayerUserId, setExpensePayerUserId] = useState("");
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseSavedStatus, setExpenseSavedStatus] = useState(null);
   const expenseDescriptionRef = useRef(null);
@@ -165,14 +166,14 @@ export function useGroupController({
       return;
     }
 
-    if (!isUuid(currentId)) {
+    if (!isUuid(expensePayerUserId)) {
       setError("Could not determine current user id for payer.");
       return;
     }
 
     const numericAmount = Number(expenseAmount);
 
-    const participants = buildExpenseParticipants(members, currentId);
+    const participants = buildExpenseParticipants(members, expensePayerUserId);
     if (!participants.length) {
       setError("No valid participant ids found for this group.");
       return;
@@ -185,7 +186,7 @@ export function useGroupController({
     try {
       await groupService.createEqualExpense(selectedGroupId, {
         description: expenseDescription.trim(),
-        payerUserId: currentId,
+        payerUserId: expensePayerUserId,
         amountCents: Math.round(numericAmount * 100),
         participants
       });
@@ -227,6 +228,7 @@ export function useGroupController({
     setExpenseSavedStatus(null);
     setExpenseDescription("");
     setExpenseAmount("");
+    setExpensePayerUserId(currentId);
     setIsExpenseModalOpen(true);
   }
 
@@ -301,6 +303,7 @@ export function useGroupController({
   function onResetGroupState() {
     setExpenseDescription("");
     setExpenseAmount("");
+    setExpensePayerUserId("");
     setIsExpenseModalOpen(false);
     setExpenseSavedStatus(null);
     setLocalGroupError("");
@@ -323,6 +326,7 @@ export function useGroupController({
       isExpenseModalOpen,
       expenseDescription,
       expenseAmount,
+      expensePayerUserId,
       expenseSavedStatus
     },
     refs: {
@@ -340,6 +344,7 @@ export function useGroupController({
       onRefreshGroupDetail: () => loadGroupDetail(selectedGroupId, { force: true }),
       setExpenseDescription,
       setExpenseAmount,
+      setExpensePayerUserId,
       onResetGroupState
     }
   };
