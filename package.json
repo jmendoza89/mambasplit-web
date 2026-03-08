@@ -17,9 +17,13 @@
   "dependencies": {
     "motion": "^12.34.3",
     "react": "^18.3.1",
+    "react-currency-input-field": "^4.0.3",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.21.0",
@@ -31,9 +35,6 @@
     "jsdom": "^26.0.0",
     "prettier": "^3.5.3",
     "vite": "^5.4.11",
-    "vitest": "^3.2.4",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.2.0",
-    "@testing-library/user-event": "^14.6.1"
+    "vitest": "^3.2.4"
   }
 }
