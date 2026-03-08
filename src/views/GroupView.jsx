@@ -153,19 +153,20 @@ export default function GroupView({
                     {expenses.map((expense, index) => (
                       <motion.li
                         key={expense.id || `${expense.description}-${index}`}
+                        className="expense-card"
                         variants={itemVariants}
                         layout
                         whileHover={{ y: -2, scale: 1.005 }}
                         transition={{ duration: 0.16 }}
                       >
-                        <div>
-                          <strong>{expense.description || "Expense"}</strong>
-                          <p>
+                        <div className="expense-main">
+                          <strong className="expense-title">{expense.description || "Expense"}</strong>
+                          <p className="expense-meta">
                             Paid by {expense.paidBy || "Unknown"}
                             {expense.createdAt ? ` | ${formatDate(expense.createdAt)}` : ""}
                           </p>
                           {expense.splits?.length ? (
-                            <p>
+                            <p className="expense-split">
                               Split: {expense.splits.map((split) => (
                                 `${split.userDisplayName}: ${formatMoney((split.amountOwedCents || 0) / 100)}`
                               )).join(", ")}
@@ -173,9 +174,9 @@ export default function GroupView({
                           ) : null}
                         </div>
                         <div className="expense-actions">
-                          <span>{formatMoney(expense.amount, expense.currency)}</span>
+                          <span className="expense-amount">{formatMoney(expense.amount, expense.currency)}</span>
                           <button
-                            className="btn-danger btn-inline"
+                            className="btn-danger btn-inline expense-delete"
                             type="button"
                             onClick={() => onDeleteExpense(expense.id)}
                             disabled={
@@ -208,3 +209,4 @@ export default function GroupView({
     </section>
   );
 }
+

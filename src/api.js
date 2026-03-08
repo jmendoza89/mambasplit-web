@@ -15,6 +15,11 @@ function withBase(path) {
 }
 
 let refreshInFlight = null;
+const DEFAULT_TIMEOUT_MS = 10000;
+const parsedTimeout = Number(import.meta.env.VITE_API_TIMEOUT_MS);
+const REQUEST_TIMEOUT_MS = Number.isFinite(parsedTimeout) && parsedTimeout > 0
+  ? parsedTimeout
+  : DEFAULT_TIMEOUT_MS;
 
 export function getAccessToken() {
   return localStorage.getItem(STORAGE_KEYS.access);
@@ -54,11 +59,24 @@ async function request(path, method = "GET", body = null, auth = true) {
     headers.Authorization = `Bearer ${getAccessToken()}`;
   }
 
-  return fetch(withBase(path), {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined
-  });
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(withBase(path), {
+      method,
+      headers,
+      signal: controller.signal,
+      body: body ? JSON.stringify(body) : undefined
+    });
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      throw new ApiError(`Request timed out after ${REQUEST_TIMEOUT_MS}ms.`, 408, err);
+    }
+    throw new ApiError("Unable to reach the API. Check that the backend is running.", 0, err);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 async function refreshAccessToken() {
@@ -135,37 +153,7 @@ export const groupsApi = {
   list: () => api("/api/v1/groups"),
   create: (name) => api("/api/v1/groups", "POST", { name }),
   delete: (groupId) => api(`/api/v1/groups/${groupId}`, "DELETE"),
-  details: async (groupId) => {
-    // Try the detailed endpoint first (includes balances, splits, etc.)
-    // Falls back to basic endpoint if detailed is not available
-    try {
-      return await api(`/api/v1/groups/${groupId}/details`);
-    } catch (err) {
-      // If auth fails on details endpoint, bubble immediately
-      if (err instanceof ApiError && err.isAuthError()) {
-        throw err;
-      }
-      
-      // Try basic endpoint as fallback
-      try {
-        return await api(`/api/v1/groups/${groupId}`);
-      } catch (fallbackErr) {
-        // If fallback also fails with auth error, bubble it
-        if (fallbackErr instanceof ApiError && fallbackErr.isAuthError()) {
-          throw fallbackErr;
-        }
-        
-        // Both endpoints failed - throw combined error with status info
-        const detailStatus = err instanceof ApiError ? err.status : "unknown";
-        const fallbackStatus = fallbackErr instanceof ApiError ? fallbackErr.status : "unknown";
-        throw new ApiError(
-          `Unable to load group details (details: ${detailStatus}, basic: ${fallbackStatus})`,
-          fallbackErr instanceof ApiError ? fallbackErr.status : 500,
-          { detailError: err, fallbackError: fallbackErr }
-        );
-      }
-    }
-  },
+  details: (groupId) => api(`/api/v1/groups/${groupId}/details`),
   createEqualExpense: (groupId, payload) => api(`/api/v1/groups/${groupId}/expenses/equal`, "POST", payload),
   deleteExpense: (groupId, expenseId) => api(`/api/v1/groups/${groupId}/expenses/${expenseId}`, "DELETE"),
   createInvite: (groupId, email) => api(`/api/v1/groups/${groupId}/invites`, "POST", { email }),

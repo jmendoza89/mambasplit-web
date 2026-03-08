@@ -267,3 +267,20 @@ Consider creating separate GitHub issues for each item with labels:
 
 - **Total Estimated Time Remaining:** ~33 hours
 - **Recommended Next Sprint:** Items #4, #7, #8 (5 hours total)
+
+---
+
+## Product Backlog Additions (2026-03-08)
+
+### Invite by user picker flow
+**Priority:** High  
+**Related backend dependency:** `MambaSplit.Api` user search + invite-by-user endpoints
+
+**Goal:**
+- Allow invite creation by selecting an existing app user instead of typing email manually.
+
+**Planned UI/logic scope:**
+- Add invite mode toggle: `By user` and `By email`.
+- Add async user search input and selectable results list.
+- Submit selected user through invite-by-user API when available.
+- Keep email-based flow as fallback for backward compatibility.
