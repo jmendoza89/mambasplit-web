@@ -62,6 +62,9 @@ export function useAuthController({
       setLoading(true);
       setError("");
       if (!getAccessToken()) {
+        clearSession();
+        setUser(null);
+        setMe(null);
         setLoading(false);
         return;
       }

@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDashboardController } from "../useDashboardController";
 import { groupService } from "../../services";
 
@@ -18,6 +18,11 @@ vi.mock("../../services", () => ({
 describe("useDashboardController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.setItem("mambasplit_access_token", "test-access-token");
+  });
+
+  afterEach(() => {
+    localStorage.removeItem("mambasplit_access_token");
   });
 
   it("creates a group and updates selected group", async () => {

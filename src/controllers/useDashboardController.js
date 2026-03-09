@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { getAccessToken } from "../api";
 import { isValidGroupName } from "../models";
 import { groupService } from "../services";
 import { extractOwnershipFromDetail } from "../utils/groupOwnership";
@@ -80,7 +81,7 @@ export function useDashboardController({
   }, [groups, currentId, groupOwnershipById]);
 
   const loadPendingInvites = useCallback(async () => {
-    if (!currentEmail || currentEmail === "-") {
+    if (!getAccessToken() || !currentEmail || currentEmail === "-") {
       setPendingInvites([]);
       setPendingInvitesError("");
       return;
