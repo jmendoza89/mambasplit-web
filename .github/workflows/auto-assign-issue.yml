@@ -17,4 +17,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_CREATOR: ${{ github.event.issue.user.login }}
-        run: gh issue edit "$ISSUE_NUMBER" --add-assignee "$ISSUE_CREATOR"
+          REPO: ${{ github.repository }}
+        run: gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-assignee "$ISSUE_CREATOR"

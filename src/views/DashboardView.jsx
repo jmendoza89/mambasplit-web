@@ -1,24 +1,43 @@
+import { useAlerts } from "../contexts/AlertContext";
+import { useAuth } from "../contexts/AuthContext";
+import { isGroupOwner as checkGroupOwnership } from "../utils/groupOwnership";
+
 export default function DashboardView({
-  currentName,
-  currentEmail,
-  currentId,
   selectedGroupId,
   groups,
   newGroupName,
   inviteEmail,
-  acceptToken,
   inviteResult,
-  busy,
+  sentInvites,
+  pendingInvites,
+  pendingInvitesLoading,
+  pendingInvitesError,
+  inviteCandidates = [],
+  inviteCandidatesLoading = false,
+  groupOwnershipById = {},
   onOpenGroupPage,
-  onLogout,
   onCreateGroup,
   onCreateInvite,
-  onAcceptInvite,
+  onAcceptPendingInvite,
+  onDeleteInvite,
+  onRefreshPendingInvites,
   setSelectedGroupId,
   setNewGroupName,
-  setInviteEmail,
-  setAcceptToken
+  setInviteEmail
 }) {
+  const { currentName, currentEmail, currentId, onLogout } = useAuth();
+  const { busy } = useAlerts();
+  function formatTimestamp(value) {
+    if (!value) return "-";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString();
+  }
+
+  function isOwnedGroup(group) {
+    return checkGroupOwnership(group, currentId, currentEmail, groupOwnershipById);
+  }
+
   return (
     <section className="dash-wrap">
       <article className="card panel">
@@ -74,16 +93,27 @@ export default function DashboardView({
               </button>
             </form>
 
-            <ul className="list">
+            <ul className="list group-list">
               {groups.map((group) => (
-                <li key={group.id} className={group.id === selectedGroupId ? "is-active" : ""}>
+                <li
+                  key={group.id}
+                  className={[
+                    group.id === selectedGroupId ? "is-active" : "",
+                    isOwnedGroup(group) ? "group-owner" : "group-member"
+                  ].filter(Boolean).join(" ")}
+                >
                   <div className="list-row">
                     <button
                       type="button"
                       className="list-btn"
                       onClick={() => setSelectedGroupId(group.id)}
                     >
-                      <span>{group.name}</span>
+                      <span className="group-name-stack">
+                        <span>{group.name}</span>
+                        <span className={`group-role-chip ${isOwnedGroup(group) ? "chip-owner" : "chip-member"}`}>
+                          {isOwnedGroup(group) ? "Owner" : "Member"}
+                        </span>
+                      </span>
                       <code>{group.id.slice(0, 8)}...</code>
                     </button>
                     <button
@@ -100,7 +130,91 @@ export default function DashboardView({
             </ul>
           </article>
 
-          <article className="card panel section-panel">
+          <article className="card panel section-panel pending-invites-panel">
+            <div className="panel-header">
+              <h3>Pending Invites</h3>
+              <button
+                type="button"
+                className="btn-inline"
+                onClick={onRefreshPendingInvites}
+                disabled={busy || pendingInvitesLoading}
+              >
+                Refresh
+              </button>
+            </div>
+
+            {pendingInvitesLoading ? <p className="list-empty list-empty-inline">Loading pending invites...</p> : null}
+
+            {!pendingInvitesLoading && pendingInvitesError ? <p className="list-empty list-empty-inline">{pendingInvitesError}</p> : null}
+
+            {!pendingInvitesLoading && !pendingInvitesError ? (
+              <ul className="list">
+                {pendingInvites.map((invite) => (
+                  <li key={invite.id}>
+                    <div className="list-row">
+                      <span>{invite.groupName}</span>
+                      <button
+                        type="button"
+                        className="btn-inline"
+                        onClick={() => onAcceptPendingInvite(invite.id)}
+                        disabled={busy || pendingInvitesLoading}
+                      >
+                        Accept
+                      </button>
+                    </div>
+                    <p><strong>Email:</strong> {invite.email}</p>
+                    <p><strong>Sent:</strong> {formatTimestamp(invite.createdAt)}</p>
+                    <p><strong>Expires:</strong> {formatTimestamp(invite.expiresAt)}</p>
+                  </li>
+                ))}
+                {!pendingInvites.length ? (
+                  <li className="list-empty">No pending invites</li>
+                ) : null}
+              </ul>
+            ) : null}
+
+          </article>
+
+          <article className="card panel section-panel invites-panel">
+            <div className="panel-header">
+              <h3>Sent Invites</h3>
+              <span className="panel-header-placeholder" aria-hidden="true" />
+            </div>
+            <ul className="list">
+              {sentInvites.map((invite) => (
+                <li key={invite.id}>
+                  <div className="list-row">
+                    <span>{invite.groupName}</span>
+                    <button
+                      type="button"
+                      className="btn-inline"
+                      onClick={() => onDeleteInvite(invite)}
+                      disabled={busy || !invite.token}
+                      title={invite.token ? "Delete invite" : "Invite token unavailable"}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <p><strong>Email:</strong> {invite.email}</p>
+                  <p><strong>Sent:</strong> {formatTimestamp(invite.createdAt)}</p>
+                  <p><strong>Expires:</strong> {formatTimestamp(invite.expiresAt)}</p>
+                </li>
+              ))}
+              {!sentInvites.length ? (
+                <li className="list-empty">No sent invites in this session</li>
+              ) : null}
+            </ul>
+
+            {inviteResult ? (
+              <div className="result-box">
+                <p><strong>Last Token:</strong> <code>{inviteResult.token}</code></p>
+                <p><strong>Email:</strong> {inviteResult.email}</p>
+                <p><strong>Expires:</strong> {inviteResult.expiresAt}</p>
+              </div>
+            ) : null}
+          </article>
+
+          <article className="card panel section-panel create-invite-panel">
             <h3>Create Invite</h3>
             <form onSubmit={onCreateInvite}>
               <div className="field">
@@ -123,52 +237,37 @@ export default function DashboardView({
 
               <div className="field">
                 <label htmlFor="inviteEmail">Invite Email</label>
-                <input
+                <select
                   id="inviteEmail"
-                  type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="friend@example.com"
                   required
-                />
+                  disabled={!selectedGroupId || inviteCandidatesLoading || inviteCandidates.length === 0}
+                >
+                  {!selectedGroupId ? <option value="">Select a group first</option> : null}
+                  {selectedGroupId && inviteCandidatesLoading ? <option value="">Loading users...</option> : null}
+                  {selectedGroupId && !inviteCandidatesLoading && inviteCandidates.length === 0 ? (
+                    <option value="">No eligible users found</option>
+                  ) : null}
+                  {inviteCandidates.map((candidate) => (
+                    <option key={candidate.id || candidate.email} value={candidate.email}>
+                      {candidate.displayName} - {candidate.email}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="actions">
-                <button type="submit" className="btn-primary" disabled={busy || !groups.length}>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={busy || !groups.length || !inviteEmail || inviteCandidatesLoading}
+                >
                   Create Invite
                 </button>
               </div>
             </form>
 
-            {inviteResult ? (
-              <div className="result-box">
-                <p><strong>Token:</strong> <code>{inviteResult.token}</code></p>
-                <p><strong>Email:</strong> {inviteResult.email}</p>
-                <p><strong>Expires:</strong> {inviteResult.expiresAt}</p>
-              </div>
-            ) : null}
-          </article>
-
-          <article className="card panel section-panel">
-            <h3>Accept Invite</h3>
-            <form onSubmit={onAcceptInvite}>
-              <div className="field">
-                <label htmlFor="acceptToken">Invite Token</label>
-                <input
-                  id="acceptToken"
-                  type="text"
-                  value={acceptToken}
-                  onChange={(e) => setAcceptToken(e.target.value)}
-                  placeholder="Paste invite token"
-                  required
-                />
-              </div>
-              <div className="actions">
-                <button type="submit" className="btn-secondary" disabled={busy}>
-                  Accept Invite
-                </button>
-              </div>
-            </form>
           </article>
         </div>
       </article>

@@ -2,13 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildExpenseParticipants,
   findSelectedGroup,
-  isValidExpenseAmount,
   normalizeExpenses,
   normalizeMembers,
+  normalizeSettlementSuggestions,
+  normalizeSettlements,
   selectDisplayedGroup
 } from "../models";
 import { groupService } from "../services";
 import { isUuid, toNumberAmount } from "../utils/formatters";
+import { validateExpenseAmount, validateExpenseDescription, validateFields } from "../utils/validation";
+
+function hasConcreteSettlementId(value) {
+  return typeof value === "string"
+    && value.trim().length > 0
+    && value !== "00000000-0000-0000-0000-000000000000";
+}
 
 export function useGroupController({
   activeView,
@@ -33,8 +41,11 @@ export function useGroupController({
   const [localGroupError, setLocalGroupError] = useState("");
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
+  const [expensePayerUserId, setExpensePayerUserId] = useState("");
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseSavedStatus, setExpenseSavedStatus] = useState(null);
+  const [isSettleUpModalOpen, setIsSettleUpModalOpen] = useState(false);
+  const [recentSettlementId, setRecentSettlementId] = useState(null);
   const expenseDescriptionRef = useRef(null);
   const expenseAmountRef = useRef(null);
 
@@ -50,6 +61,11 @@ export function useGroupController({
 
   const members = useMemo(() => normalizeMembers(displayedGroup), [displayedGroup]);
   const expenses = useMemo(() => normalizeExpenses(displayedGroup, members), [displayedGroup, members]);
+  const settlements = useMemo(() => normalizeSettlements(displayedGroup), [displayedGroup]);
+  const settlementSuggestions = useMemo(
+    () => normalizeSettlementSuggestions(displayedGroup),
+    [displayedGroup]
+  );
   const detailsSummary = displayedGroup?.summary || null;
   const detailsMe = displayedGroup?.me || null;
   const detailsGroupInfo = displayedGroup?.group || null;
@@ -79,6 +95,12 @@ export function useGroupController({
     return expenses.reduce((sum, expense) => sum + toNumberAmount(expense.amount), 0);
   }, [detailsSummary, expenses]);
   const expenseCount = typeof detailsSummary?.expenseCount === "number" ? detailsSummary.expenseCount : expenses.length;
+  const settlementCount = typeof detailsSummary?.settlementCount === "number"
+    ? detailsSummary.settlementCount
+    : settlements.length;
+  const totalSettlementAmount = typeof detailsSummary?.totalSettlementAmountCents === "number"
+    ? detailsSummary.totalSettlementAmountCents / 100
+    : settlements.reduce((sum, settlement) => sum + ((settlement.amountCents || 0) / 100), 0);
 
   const loadGroupDetail = useCallback(async (groupId, options = {}) => {
     if (!groupId) return;
@@ -148,19 +170,31 @@ export function useGroupController({
 
   async function onCreateExpense(e) {
     if (e) e.preventDefault();
-    if (!selectedGroupId || !expenseDescription.trim() || !expenseAmount.trim()) return;
-    if (!isUuid(currentId)) {
+    
+    // Validate all inputs
+    const validationError = validateFields([
+      validateExpenseDescription(expenseDescription),
+      validateExpenseAmount(expenseAmount)
+    ]);
+    
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    if (!selectedGroupId) {
+      setError("No group selected.");
+      return;
+    }
+
+    if (!isUuid(expensePayerUserId)) {
       setError("Could not determine current user id for payer.");
       return;
     }
 
-    if (!isValidExpenseAmount(expenseAmount)) {
-      setError("Amount must be greater than zero.");
-      return;
-    }
     const numericAmount = Number(expenseAmount);
 
-    const participants = buildExpenseParticipants(members, currentId);
+    const participants = buildExpenseParticipants(members, expensePayerUserId);
     if (!participants.length) {
       setError("No valid participant ids found for this group.");
       return;
@@ -173,7 +207,7 @@ export function useGroupController({
     try {
       await groupService.createEqualExpense(selectedGroupId, {
         description: expenseDescription.trim(),
-        payerUserId: currentId,
+        payerUserId: expensePayerUserId,
         amountCents: Math.round(numericAmount * 100),
         participants
       });
@@ -215,6 +249,7 @@ export function useGroupController({
     setExpenseSavedStatus(null);
     setExpenseDescription("");
     setExpenseAmount("");
+    setExpensePayerUserId(currentId);
     setIsExpenseModalOpen(true);
   }
 
@@ -264,6 +299,10 @@ export function useGroupController({
   async function onDeleteExpense(expenseId) {
     if (!selectedGroupId || !expenseId) return;
     const expense = expenses.find((item) => item.id === expenseId);
+    if (expense?.settlementId) {
+      setError("Settled expenses cannot be deleted.");
+      return;
+    }
     if (expense?.payerUserId && expense.payerUserId !== currentId) {
       setError("Only the expense owner can delete this expense.");
       return;
@@ -280,15 +319,64 @@ export function useGroupController({
       await loadGroupDetail(selectedGroupId, { force: true });
       setSuccess("Expense deleted.");
     } catch (err) {
+      if (err?.status === 409) {
+        const latestDetail = await groupService.details(selectedGroupId);
+        setGroupDetail(latestDetail);
+        const latestExpense = (latestDetail?.expenses || []).find((item) => item?.id === expenseId);
+        if (!latestExpense) {
+          setSuccess("Expense deleted.");
+        } else if (hasConcreteSettlementId(latestExpense?.settlementId)) {
+          setError("Expense cannot be deleted because it is already settled.");
+        } else {
+          setError(err.message || "Expense cannot be deleted due to a conflict.");
+        }
+        return;
+      }
       setError(err.message || "Could not delete expense.");
     } finally {
       setBusy(false);
     }
   }
 
+  async function onCreateSettlement(payload) {
+    if (!selectedGroupId) {
+      setError("No group selected.");
+      return null;
+    }
+
+    setError("");
+    setSuccess("");
+    setBusy(true);
+    try {
+      const result = await groupService.createSettlement(selectedGroupId, payload);
+      const normalizedResult = result || { settlementId: null };
+      setRecentSettlementId(result?.settlementId || result?.settlement?.id || null);
+      await loadGroupDetail(selectedGroupId, { force: true });
+      setSuccess("Settlement saved.");
+      setIsSettleUpModalOpen(false);
+      return normalizedResult;
+    } catch (err) {
+      const baseMessage = err.message || "Could not save settlement.";
+      const errorMessage = err?.status ? `${baseMessage} (HTTP ${err.status})` : baseMessage;
+      setError(errorMessage);
+      return { errorMessage };
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function onOpenSettleUpModal() {
+    setIsSettleUpModalOpen(true);
+  }
+
+  function onCloseSettleUpModal() {
+    setIsSettleUpModalOpen(false);
+  }
+
   function onResetGroupState() {
     setExpenseDescription("");
     setExpenseAmount("");
+    setExpensePayerUserId("");
     setIsExpenseModalOpen(false);
     setExpenseSavedStatus(null);
     setLocalGroupError("");
@@ -306,11 +394,18 @@ export function useGroupController({
       effectiveMyRole,
       displayMembers,
       expenses,
+      settlements,
+      settlementSuggestions,
       totalExpense,
       expenseCount,
+      settlementCount,
+      totalSettlementAmount,
       isExpenseModalOpen,
+      isSettleUpModalOpen,
+      recentSettlementId,
       expenseDescription,
       expenseAmount,
+      expensePayerUserId,
       expenseSavedStatus
     },
     refs: {
@@ -323,11 +418,15 @@ export function useGroupController({
       onExpenseDescriptionKeyDown,
       onOpenExpenseModal,
       onCloseExpenseModal,
+      onOpenSettleUpModal,
+      onCloseSettleUpModal,
+      onCreateSettlement,
       onDeleteExpense,
       onDeleteGroup,
       onRefreshGroupDetail: () => loadGroupDetail(selectedGroupId, { force: true }),
       setExpenseDescription,
       setExpenseAmount,
+      setExpensePayerUserId,
       onResetGroupState
     }
   };

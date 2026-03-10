@@ -1,4 +1,6 @@
-﻿const STORAGE_KEYS = {
+﻿import { ApiError, createErrorFromResponse } from "./utils/apiError";
+
+const STORAGE_KEYS = {
   access: "mambasplit_access_token",
   refresh: "mambasplit_refresh_token",
   user: "mambasplit_user"
@@ -13,6 +15,11 @@ function withBase(path) {
 }
 
 let refreshInFlight = null;
+const DEFAULT_TIMEOUT_MS = 10000;
+const parsedTimeout = Number(import.meta.env.VITE_API_TIMEOUT_MS);
+const REQUEST_TIMEOUT_MS = Number.isFinite(parsedTimeout) && parsedTimeout > 0
+  ? parsedTimeout
+  : DEFAULT_TIMEOUT_MS;
 
 export function getAccessToken() {
   return localStorage.getItem(STORAGE_KEYS.access);
@@ -52,11 +59,24 @@ async function request(path, method = "GET", body = null, auth = true) {
     headers.Authorization = `Bearer ${getAccessToken()}`;
   }
 
-  return fetch(withBase(path), {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined
-  });
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(withBase(path), {
+      method,
+      headers,
+      signal: controller.signal,
+      body: body ? JSON.stringify(body) : undefined
+    });
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      throw new ApiError(`Request timed out after ${REQUEST_TIMEOUT_MS}ms.`, 408, err);
+    }
+    throw new ApiError("Unable to reach the API. Check that the backend is running.", 0, err);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 async function refreshAccessToken() {
@@ -69,9 +89,7 @@ async function refreshAccessToken() {
     const response = await request("/api/v1/auth/refresh", "POST", { refreshToken }, false);
     if (!response.ok) {
       clearSession();
-      const err = new Error("Session expired.");
-      err.status = response.status;
-      throw err;
+      throw await createErrorFromResponse(response, "Session expired");
     }
 
     const data = await response.json();
@@ -109,10 +127,7 @@ export async function api(path, method = "GET", body = null, auth = true) {
   }
 
   if (!response.ok) {
-    const message = (data && data.message) || `Request failed (${response.status}).`;
-    const err = new Error(message);
-    err.status = response.status;
-    throw err;
+    throw await createErrorFromResponse(response, "Request failed");
   }
 
   return data;
@@ -138,29 +153,32 @@ export const groupsApi = {
   list: () => api("/api/v1/groups"),
   create: (name) => api("/api/v1/groups", "POST", { name }),
   delete: (groupId) => api(`/api/v1/groups/${groupId}`, "DELETE"),
-  details: async (groupId) => {
-    let firstError = null;
-    try {
-      return await api(`/api/v1/groups/${groupId}/details`);
-    } catch (err) {
-      firstError = err;
-      // If auth fails, bubbling immediately is clearer than attempting fallback.
-      if (err.status === 401 || err.status === 403) throw err;
-    }
-
-    try {
-      return await api(`/api/v1/groups/${groupId}`);
-    } catch (fallbackErr) {
-      if (fallbackErr.status === 401 || fallbackErr.status === 403) throw fallbackErr;
-      const combined = new Error(
-        `Group details failed (details: ${firstError?.status || "?"}, fallback: ${fallbackErr?.status || "?"}).`
-      );
-      combined.status = fallbackErr.status || firstError?.status;
-      throw combined;
-    }
-  },
+  details: (groupId) => api(`/api/v1/groups/${groupId}/details`),
   createEqualExpense: (groupId, payload) => api(`/api/v1/groups/${groupId}/expenses/equal`, "POST", payload),
   deleteExpense: (groupId, expenseId) => api(`/api/v1/groups/${groupId}/expenses/${expenseId}`, "DELETE"),
+  createSettlement: (groupId, payload) => api(`/api/v1/groups/${groupId}/settlements`, "POST", payload),
+  listSettlements: (groupId) => api(`/api/v1/groups/${groupId}/settlements`),
   createInvite: (groupId, email) => api(`/api/v1/groups/${groupId}/invites`, "POST", { email }),
+  cancelInvite: (groupId, token) => api(`/api/v1/groups/${groupId}/invites/${encodeURIComponent(token)}`, "DELETE"),
   acceptInvite: (token) => api("/api/v1/invites/accept", "POST", { token })
+};
+
+export const invitesApi = {
+  listPendingByEmail: (email) => api(`/api/v1/invites?email=${encodeURIComponent(email)}`),
+  acceptById: (inviteId) => api(`/api/v1/invites/${inviteId}/accept`, "POST")
+};
+
+export const usersApi = {
+  search: (query = "", groupId = "") => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (groupId) params.set("groupId", groupId);
+    const suffix = params.toString();
+    return api(`/api/v1/users/search${suffix ? `?${suffix}` : ""}`);
+  }
+};
+
+export const settlementsApi = {
+  getById: (settlementId) => api(`/api/v1/settlements/${settlementId}`),
+  listByUser: (userId) => api(`/api/v1/users/${userId}/settlements`)
 };
