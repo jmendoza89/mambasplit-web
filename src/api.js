@@ -156,6 +156,8 @@ export const groupsApi = {
   details: (groupId) => api(`/api/v1/groups/${groupId}/details`),
   createEqualExpense: (groupId, payload) => api(`/api/v1/groups/${groupId}/expenses/equal`, "POST", payload),
   deleteExpense: (groupId, expenseId) => api(`/api/v1/groups/${groupId}/expenses/${expenseId}`, "DELETE"),
+  createSettlement: (groupId, payload) => api(`/api/v1/groups/${groupId}/settlements`, "POST", payload),
+  listSettlements: (groupId) => api(`/api/v1/groups/${groupId}/settlements`),
   createInvite: (groupId, email) => api(`/api/v1/groups/${groupId}/invites`, "POST", { email }),
   cancelInvite: (groupId, token) => api(`/api/v1/groups/${groupId}/invites/${encodeURIComponent(token)}`, "DELETE"),
   acceptInvite: (token) => api("/api/v1/invites/accept", "POST", { token })
@@ -164,4 +166,9 @@ export const groupsApi = {
 export const invitesApi = {
   listPendingByEmail: (email) => api(`/api/v1/invites?email=${encodeURIComponent(email)}`),
   acceptById: (inviteId) => api(`/api/v1/invites/${inviteId}/accept`, "POST")
+};
+
+export const settlementsApi = {
+  getById: (settlementId) => api(`/api/v1/settlements/${settlementId}`),
+  listByUser: (userId) => api(`/api/v1/users/${userId}/settlements`)
 };

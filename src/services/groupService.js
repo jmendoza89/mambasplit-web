@@ -1,4 +1,4 @@
-import { groupsApi, invitesApi, meApi } from "../api";
+import { groupsApi, invitesApi, meApi, settlementsApi } from "../api";
 
 export async function fetchSessionData() {
   const me = await meApi.fetchMe();
@@ -17,5 +17,9 @@ export const groupService = {
   listPendingInvitesByEmail: invitesApi.listPendingByEmail,
   acceptPendingInviteById: invitesApi.acceptById,
   createEqualExpense: groupsApi.createEqualExpense,
-  deleteExpense: groupsApi.deleteExpense
+  deleteExpense: groupsApi.deleteExpense,
+  createSettlement: groupsApi.createSettlement,
+  listGroupSettlements: groupsApi.listSettlements,
+  getSettlement: settlementsApi.getById,
+  listUserSettlements: settlementsApi.listByUser
 };
