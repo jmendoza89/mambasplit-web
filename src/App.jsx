@@ -132,15 +132,24 @@ export default function App() {
             detailsMe={state.detailsMe}
             effectiveMemberCount={state.effectiveMemberCount}
             expenseCount={state.expenseCount}
+            settlementCount={state.settlementCount}
             totalExpense={state.totalExpense}
+            totalSettlementAmount={state.totalSettlementAmount}
             effectiveMyRole={state.effectiveMyRole}
             groupError={state.groupError}
             displayMembers={state.displayMembers}
             expenses={state.expenses}
+            settlements={state.settlements}
+            settlementSuggestions={state.settlementSuggestions}
+            recentSettlementId={state.recentSettlementId}
             listVariants={listVariants}
             itemVariants={itemVariants}
             onBackToDashboard={() => actions.setActiveView("dashboard")}
             onOpenExpenseModal={actions.onOpenExpenseModal}
+            onOpenSettleUpModal={actions.onOpenSettleUpModal}
+            onCloseSettleUpModal={actions.onCloseSettleUpModal}
+            onCreateSettlement={actions.onCreateSettlement}
+            isSettleUpModalOpen={state.isSettleUpModalOpen}
             onDeleteExpense={actions.onDeleteExpense}
             onRefreshGroupDetail={actions.onRefreshGroupDetail}
             onDeleteGroup={actions.onDeleteGroup}

@@ -40,15 +40,38 @@ export class ApiError extends Error {
  * Create an ApiError from a fetch response
  */
 export async function createErrorFromResponse(response, fallbackMessage = "Request failed") {
+  let raw = "";
   let data = null;
   try {
-    data = await response.json();
+    raw = await response.text();
   } catch {
-    // Response has no JSON body
+    raw = "";
   }
 
-  const message = (data && data.message) || `${fallbackMessage} (${response.status}).`;
-  return new ApiError(message, response.status);
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = null;
+    }
+  }
+
+  const validationMessages = data && typeof data === "object" && data.errors && typeof data.errors === "object"
+    ? Object.entries(data.errors)
+        .flatMap(([field, messages]) => (Array.isArray(messages) ? messages.map((msg) => `${field}: ${msg}`) : []))
+    : [];
+
+  const parsedMessage = data && typeof data === "object"
+    ? data.message
+      || data.detail
+      || data.title
+      || data.error
+      || (validationMessages.length ? validationMessages.join("; ") : null)
+    : null;
+
+  const textFallback = raw && !raw.trim().startsWith("<") ? raw.trim() : null;
+  const message = parsedMessage || textFallback || `${fallbackMessage} (${response.status}).`;
+  return new ApiError(message, response.status, data || raw || null);
 }
 
 /**

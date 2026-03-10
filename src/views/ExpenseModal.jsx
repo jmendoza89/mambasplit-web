@@ -1,6 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import CurrencyInput from "react-currency-input-field";
 import { useAlerts } from "../contexts/AlertContext";
 import { formatDate, formatMoney } from "../utils/formatters";
 
@@ -110,21 +109,22 @@ export default function ExpenseModal({
               </div>
               <div className="field expense-amount-field">
                 <label htmlFor="expenseAmount">Amount</label>
-                <CurrencyInput
+                <input
                   ref={expenseAmountRef}
                   id="expenseAmount"
                   name="expenseAmount"
+                  type="number"
                   min="0.01"
                   step={0.01}
                   value={expenseAmount}
-                  onValueChange={(value) => setExpenseAmount(value || "")}
-                  decimalsLimit={2}
-                  decimalScale={2}
-                  fixedDecimalLength={2}
-                  disableAbbreviations
-                  disableGroupSeparators
-                  allowNegativeValue={false}
-                  prefix="$"
+                  onChange={(e) => setExpenseAmount(e.target.value)}
+                  onBlur={(e) => {
+                    const raw = e.target.value;
+                    if (!raw) return;
+                    const parsed = Number(raw);
+                    if (!Number.isFinite(parsed) || parsed <= 0) return;
+                    setExpenseAmount(parsed.toFixed(2));
+                  }}
                   placeholder="0.00"
                   autoComplete="off"
                   required
