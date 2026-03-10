@@ -11,7 +11,8 @@ vi.mock("../../services", () => ({
     cancelInvite: vi.fn(async () => {}),
     details: vi.fn(async () => ({ me: { role: "MEMBER" }, group: { createdBy: "someone-else" } })),
     acceptPendingInviteById: vi.fn(async () => {}),
-    listPendingInvitesByEmail: vi.fn(async () => [])
+    listPendingInvitesByEmail: vi.fn(async () => []),
+    searchUsers: vi.fn(async () => [])
   }
 }));
 

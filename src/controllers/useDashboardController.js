@@ -24,6 +24,8 @@ export function useDashboardController({
   const [pendingInvites, setPendingInvites] = useState([]);
   const [pendingInvitesLoading, setPendingInvitesLoading] = useState(false);
   const [pendingInvitesError, setPendingInvitesError] = useState("");
+  const [inviteCandidates, setInviteCandidates] = useState([]);
+  const [inviteCandidatesLoading, setInviteCandidatesLoading] = useState(false);
   const [groupOwnershipById, setGroupOwnershipById] = useState({});
 
   useEffect(() => {
@@ -104,6 +106,44 @@ export function useDashboardController({
     loadPendingInvites();
   }, [loadPendingInvites]);
 
+  const loadInviteCandidates = useCallback(async (groupId) => {
+    if (!groupId || !getAccessToken()) {
+      setInviteCandidates([]);
+      setInviteCandidatesLoading(false);
+      return;
+    }
+
+    setInviteCandidatesLoading(true);
+    try {
+      const users = await groupService.searchUsers("", groupId);
+      const normalized = Array.isArray(users)
+        ? users
+            .filter((user) => typeof user?.email === "string" && user.email.trim().length > 0)
+            .map((user) => ({
+              id: user.id || user.userId || user.email,
+              displayName: user.displayName || user.name || user.email,
+              email: user.email
+            }))
+        : [];
+      setInviteCandidates(normalized);
+      setInviteEmail((prev) => {
+        if (prev && normalized.some((candidate) => candidate.email === prev)) {
+          return prev;
+        }
+        return normalized[0]?.email || "";
+      });
+    } catch {
+      setInviteCandidates([]);
+      setInviteEmail("");
+    } finally {
+      setInviteCandidatesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInviteCandidates(selectedGroupId);
+  }, [selectedGroupId, loadInviteCandidates]);
+
   async function onCreateGroup(e) {
     e.preventDefault();
     if (!isValidGroupName(newGroupName)) return;
@@ -163,6 +203,8 @@ export function useDashboardController({
     setPendingInvites([]);
     setPendingInvitesLoading(false);
     setPendingInvitesError("");
+    setInviteCandidates([]);
+    setInviteCandidatesLoading(false);
     setGroupOwnershipById({});
   }
 
@@ -214,6 +256,8 @@ export function useDashboardController({
       pendingInvites,
       pendingInvitesLoading,
       pendingInvitesError,
+      inviteCandidates,
+      inviteCandidatesLoading,
       groupOwnershipById
     },
     actions: {

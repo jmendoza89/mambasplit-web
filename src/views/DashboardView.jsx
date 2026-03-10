@@ -12,6 +12,8 @@ export default function DashboardView({
   pendingInvites,
   pendingInvitesLoading,
   pendingInvitesError,
+  inviteCandidates = [],
+  inviteCandidatesLoading = false,
   groupOwnershipById = {},
   onOpenGroupPage,
   onCreateGroup,
@@ -235,18 +237,32 @@ export default function DashboardView({
 
               <div className="field">
                 <label htmlFor="inviteEmail">Invite Email</label>
-                <input
+                <select
                   id="inviteEmail"
-                  type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="friend@example.com"
                   required
-                />
+                  disabled={!selectedGroupId || inviteCandidatesLoading || inviteCandidates.length === 0}
+                >
+                  {!selectedGroupId ? <option value="">Select a group first</option> : null}
+                  {selectedGroupId && inviteCandidatesLoading ? <option value="">Loading users...</option> : null}
+                  {selectedGroupId && !inviteCandidatesLoading && inviteCandidates.length === 0 ? (
+                    <option value="">No eligible users found</option>
+                  ) : null}
+                  {inviteCandidates.map((candidate) => (
+                    <option key={candidate.id || candidate.email} value={candidate.email}>
+                      {candidate.displayName} - {candidate.email}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="actions">
-                <button type="submit" className="btn-primary" disabled={busy || !groups.length}>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={busy || !groups.length || !inviteEmail || inviteCandidatesLoading}
+                >
                   Create Invite
                 </button>
               </div>

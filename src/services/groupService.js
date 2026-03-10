@@ -1,4 +1,4 @@
-import { groupsApi, invitesApi, meApi, settlementsApi } from "../api";
+import { groupsApi, invitesApi, meApi, settlementsApi, usersApi } from "../api";
 
 export async function fetchSessionData() {
   const me = await meApi.fetchMe();
@@ -21,5 +21,6 @@ export const groupService = {
   createSettlement: groupsApi.createSettlement,
   listGroupSettlements: groupsApi.listSettlements,
   getSettlement: settlementsApi.getById,
-  listUserSettlements: settlementsApi.listByUser
+  listUserSettlements: settlementsApi.listByUser,
+  searchUsers: usersApi.search
 };

@@ -168,6 +168,16 @@ export const invitesApi = {
   acceptById: (inviteId) => api(`/api/v1/invites/${inviteId}/accept`, "POST")
 };
 
+export const usersApi = {
+  search: (query = "", groupId = "") => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (groupId) params.set("groupId", groupId);
+    const suffix = params.toString();
+    return api(`/api/v1/users/search${suffix ? `?${suffix}` : ""}`);
+  }
+};
+
 export const settlementsApi = {
   getById: (settlementId) => api(`/api/v1/settlements/${settlementId}`),
   listByUser: (userId) => api(`/api/v1/users/${userId}/settlements`)

@@ -142,6 +142,8 @@ export function useAppController() {
       pendingInvites: dashboardController.state.pendingInvites,
       pendingInvitesLoading: dashboardController.state.pendingInvitesLoading,
       pendingInvitesError: dashboardController.state.pendingInvitesError,
+      inviteCandidates: dashboardController.state.inviteCandidates,
+      inviteCandidatesLoading: dashboardController.state.inviteCandidatesLoading,
       groupOwnershipById: dashboardController.state.groupOwnershipById,
       displayName,
       email,

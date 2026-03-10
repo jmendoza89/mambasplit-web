@@ -111,6 +111,8 @@ export default function App() {
             pendingInvites={state.pendingInvites}
             pendingInvitesLoading={state.pendingInvitesLoading}
             pendingInvitesError={state.pendingInvitesError}
+            inviteCandidates={state.inviteCandidates}
+            inviteCandidatesLoading={state.inviteCandidatesLoading}
             groupOwnershipById={state.groupOwnershipById}
             onOpenGroupPage={actions.onOpenGroupPage}
             onCreateGroup={actions.onCreateGroup}
