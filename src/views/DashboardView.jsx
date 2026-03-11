@@ -162,7 +162,7 @@ export default function DashboardView({
                         Accept
                       </button>
                     </div>
-                    <p><strong>Email:</strong> {invite.email}</p>
+                    <p><strong>From:</strong> {invite.email}</p>
                     <p><strong>Sent:</strong> {formatTimestamp(invite.createdAt)}</p>
                     <p><strong>Expires:</strong> {formatTimestamp(invite.expiresAt)}</p>
                   </li>
