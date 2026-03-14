@@ -539,21 +539,77 @@ button:disabled {
   box-shadow: var(--shadow-sm);
 }
 
-.result-box {
-  margin-top: 12px;
-  background: linear-gradient(180deg, rgba(119, 242, 185, 0.22), rgba(215, 255, 237, 0.78));
-  border: 1px solid rgba(2, 64, 89, 0.22);
-  border-radius: 12px;
-  padding: 11px;
+.dashboard-invite-list {
+  gap: 10px;
 }
 
-.result-box p {
-  margin: 0 0 6px;
+.dashboard-invite-card {
+  position: relative;
+  align-items: stretch;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border-color: rgba(7, 66, 92, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 250, 252, 0.96));
+  box-shadow: 0 10px 22px rgba(7, 66, 92, 0.12);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.dashboard-invite-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2e8ea8, #6fe0bb);
+}
+
+.dashboard-invite-card-pending::before {
+  background: linear-gradient(180deg, #2e8ea8, #70c6e7);
+}
+
+.dashboard-invite-card-sent::before {
+  background: linear-gradient(180deg, #7f3dca, #c9658f);
+}
+
+.dashboard-invite-card:hover {
+  transform: translateY(-2px) scale(1.005);
+  box-shadow: 0 14px 24px rgba(7, 66, 92, 0.15);
+}
+
+.dashboard-invite-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-invite-main p {
+  margin: 5px 0 0;
+  color: #2f6070;
+  font-size: 0.92rem;
+  line-height: 1.35;
   line-break: anywhere;
 }
 
-.result-box p:last-child {
-  margin-bottom: 0;
+.dashboard-invite-action {
+  margin-right: 0;
+}
+
+.dashboard-invite-card-highlight {
+  animation: dashboard-invite-highlight 1100ms ease-out;
+}
+
+@keyframes dashboard-invite-highlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(127, 61, 202, 0.45), 0 10px 22px rgba(7, 66, 92, 0.12);
+  }
+  35% {
+    box-shadow: 0 0 0 6px rgba(127, 61, 202, 0.18), 0 12px 24px rgba(7, 66, 92, 0.15);
+  }
+  100% {
+    box-shadow: 0 10px 22px rgba(7, 66, 92, 0.12);
+  }
 }
 
 .group-page-top {

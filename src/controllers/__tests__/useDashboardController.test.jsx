@@ -9,6 +9,7 @@ vi.mock("../../services", () => ({
     create: vi.fn(async (name) => ({ id: "g-new", name })),
     createInvite: vi.fn(async () => ({ token: "t1", email: "friend@example.com", expiresAt: "tomorrow" })),
     cancelInvite: vi.fn(async () => {}),
+    listGroupInvites: vi.fn(async () => []),
     details: vi.fn(async () => ({ me: { role: "MEMBER" }, group: { createdBy: "someone-else" } })),
     acceptPendingInviteById: vi.fn(async () => {}),
     listPendingInvitesByEmail: vi.fn(async () => []),
@@ -255,5 +256,83 @@ describe("useDashboardController", () => {
 
     expect(groupService.cancelInvite).not.toHaveBeenCalled();
     expect(setError).toHaveBeenCalledWith("Invite token is unavailable for this row.");
+  });
+
+  it("filters out already-sent emails from invite candidates", async () => {
+    groupService.searchUsers.mockResolvedValue([
+      { id: "u1", displayName: "Friend One", email: "friend1@example.com" },
+      { id: "u2", displayName: "Friend Two", email: "friend2@example.com" }
+    ]);
+    groupService.listGroupInvites.mockResolvedValueOnce([
+      {
+        id: "existing-invite-1",
+        groupId: "group-1",
+        email: "friend1@example.com",
+        createdAt: "2026-03-01T00:00:00Z",
+        expiresAt: "2026-03-08T00:00:00Z"
+      }
+    ]);
+
+    const { result } = renderHook(() =>
+      useDashboardController({
+        groups: [{ id: "group-1", name: "Trip" }],
+        selectedGroupId: "group-1",
+        setGroups: vi.fn(),
+        setSelectedGroupId: vi.fn(),
+        setError: vi.fn(),
+        setSuccess: vi.fn(),
+        setBusy: vi.fn(),
+        currentId: "user-1",
+        currentEmail: "u@example.com",
+        loadSessionData: vi.fn(async () => {}),
+        onOpenGroupPage: vi.fn()
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.inviteCandidatesLoading).toBe(false);
+    });
+
+    await waitFor(() => {
+      expect(result.current.state.inviteCandidates).toHaveLength(1);
+    });
+
+    expect(result.current.state.inviteCandidates[0].email).toBe("friend2@example.com");
+  });
+
+  it("shows descriptive 409 invite conflict message", async () => {
+    groupService.searchUsers.mockResolvedValueOnce([
+      { id: "u1", displayName: "Friend One", email: "friend1@example.com" }
+    ]);
+    groupService.createInvite.mockRejectedValueOnce({ status: 409, message: "Request failed (409)." });
+    const setError = vi.fn();
+
+    const { result } = renderHook(() =>
+      useDashboardController({
+        groups: [{ id: "group-1", name: "Trip" }],
+        selectedGroupId: "group-1",
+        setGroups: vi.fn(),
+        setSelectedGroupId: vi.fn(),
+        setError,
+        setSuccess: vi.fn(),
+        setBusy: vi.fn(),
+        currentId: "user-1",
+        currentEmail: "u@example.com",
+        loadSessionData: vi.fn(async () => {}),
+        onOpenGroupPage: vi.fn()
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.inviteCandidatesLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.actions.onCreateInvite({ preventDefault: vi.fn() });
+    });
+
+    expect(setError).toHaveBeenCalledWith(
+      "Could not create invite for friend1@example.com: an active invite already exists for this group, or the user is already a member."
+    );
   });
 });

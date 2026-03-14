@@ -4,6 +4,7 @@ import { authService, submitAuth, submitGoogleAuth } from "../services";
 
 const GOOGLE_SCRIPT_ID = "google-identity-services-script";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_TOKEN_MISSING_ERROR = "Google login failed: no ID token was returned. Please try again.";
 let googleScriptPromise = null;
 
 function ensureGoogleScriptLoaded() {
@@ -107,7 +108,7 @@ export function useAuthController({
   async function onGoogleLoginSuccess(credentialResponse) {
     const idToken = credentialResponse?.credential;
     if (!idToken) {
-      setError("Google login failed.");
+      setError(GOOGLE_TOKEN_MISSING_ERROR);
       return;
     }
 
@@ -129,7 +130,7 @@ export function useAuthController({
   }
 
   function onGoogleLoginError() {
-    setError("Google login failed.");
+    setError(GOOGLE_TOKEN_MISSING_ERROR);
   }
 
   async function onGoogleLogin() {

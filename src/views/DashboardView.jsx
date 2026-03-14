@@ -1,6 +1,7 @@
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
 import { isGroupOwner as checkGroupOwnership } from "../utils/groupOwnership";
+import DashboardInviteCard from "./components/DashboardInviteCard";
 
 export default function DashboardView({
   selectedGroupId,
@@ -54,6 +55,14 @@ export default function DashboardView({
               disabled={!selectedGroupId || busy}
             >
               Open Group Page
+            </button>
+            <button
+              type="button"
+              className="btn-inline"
+              onClick={onRefreshPendingInvites}
+              disabled={busy || pendingInvitesLoading}
+            >
+              Refresh
             </button>
             <button className="btn-ghost" type="button" onClick={onLogout} disabled={busy}>
               Logout
@@ -133,14 +142,7 @@ export default function DashboardView({
           <article className="card panel section-panel pending-invites-panel">
             <div className="panel-header">
               <h3>Pending Invites</h3>
-              <button
-                type="button"
-                className="btn-inline"
-                onClick={onRefreshPendingInvites}
-                disabled={busy || pendingInvitesLoading}
-              >
-                Refresh
-              </button>
+              <span className="panel-header-placeholder" aria-hidden="true" />
             </div>
 
             {pendingInvitesLoading ? <p className="list-empty list-empty-inline">Loading pending invites...</p> : null}
@@ -148,24 +150,20 @@ export default function DashboardView({
             {!pendingInvitesLoading && pendingInvitesError ? <p className="list-empty list-empty-inline">{pendingInvitesError}</p> : null}
 
             {!pendingInvitesLoading && !pendingInvitesError ? (
-              <ul className="list">
+              <ul className="list dashboard-invite-list">
                 {pendingInvites.map((invite) => (
-                  <li key={invite.id}>
-                    <div className="list-row">
-                      <span>{invite.groupName}</span>
-                      <button
-                        type="button"
-                        className="btn-inline"
-                        onClick={() => onAcceptPendingInvite(invite.id)}
-                        disabled={busy || pendingInvitesLoading}
-                      >
-                        Accept
-                      </button>
-                    </div>
-                    <p><strong>Email:</strong> {invite.email}</p>
-                    <p><strong>Sent:</strong> {formatTimestamp(invite.createdAt)}</p>
-                    <p><strong>Expires:</strong> {formatTimestamp(invite.expiresAt)}</p>
-                  </li>
+                  <DashboardInviteCard
+                    key={invite.id}
+                    groupName={invite.groupName}
+                    email={invite.email}
+                    createdAt={formatTimestamp(invite.createdAt)}
+                    expiresAt={formatTimestamp(invite.expiresAt)}
+                    emailLabel="Email"
+                    actionLabel="Accept"
+                    onAction={() => onAcceptPendingInvite(invite.id)}
+                    actionDisabled={busy || pendingInvitesLoading}
+                    variant="pending"
+                  />
                 ))}
                 {!pendingInvites.length ? (
                   <li className="list-empty">No pending invites</li>
@@ -180,38 +178,27 @@ export default function DashboardView({
               <h3>Sent Invites</h3>
               <span className="panel-header-placeholder" aria-hidden="true" />
             </div>
-            <ul className="list">
+            <ul className="list dashboard-invite-list">
               {sentInvites.map((invite) => (
-                <li key={invite.id}>
-                  <div className="list-row">
-                    <span>{invite.groupName}</span>
-                    <button
-                      type="button"
-                      className="btn-inline"
-                      onClick={() => onDeleteInvite(invite)}
-                      disabled={busy || !invite.token}
-                      title={invite.token ? "Delete invite" : "Invite token unavailable"}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                  <p><strong>Email:</strong> {invite.email}</p>
-                  <p><strong>Sent:</strong> {formatTimestamp(invite.createdAt)}</p>
-                  <p><strong>Expires:</strong> {formatTimestamp(invite.expiresAt)}</p>
-                </li>
+                <DashboardInviteCard
+                  key={invite.id}
+                  groupName={invite.groupName}
+                  email={invite.email}
+                  createdAt={formatTimestamp(invite.createdAt)}
+                  expiresAt={formatTimestamp(invite.expiresAt)}
+                  emailLabel="To"
+                  actionLabel="Delete"
+                  onAction={() => onDeleteInvite(invite)}
+                  actionDisabled={busy || !invite.token}
+                  actionTitle={invite.token ? "Delete invite" : "Invite token unavailable"}
+                  variant="sent"
+                  highlighted={inviteResult?.token === invite.token}
+                />
               ))}
               {!sentInvites.length ? (
                 <li className="list-empty">No sent invites in this session</li>
               ) : null}
             </ul>
-
-            {inviteResult ? (
-              <div className="result-box">
-                <p><strong>Last Token:</strong> <code>{inviteResult.token}</code></p>
-                <p><strong>Email:</strong> {inviteResult.email}</p>
-                <p><strong>Expires:</strong> {inviteResult.expiresAt}</p>
-              </div>
-            ) : null}
           </article>
 
           <article className="card panel section-panel create-invite-panel">
