@@ -12,6 +12,7 @@ export const groupService = {
   details: groupsApi.details,
   delete: groupsApi.delete,
   createInvite: groupsApi.createInvite,
+  listGroupInvites: groupsApi.listGroupInvites,
   cancelInvite: groupsApi.cancelInvite,
   acceptInvite: groupsApi.acceptInvite,
   listPendingInvitesByEmail: invitesApi.listPendingByEmail,

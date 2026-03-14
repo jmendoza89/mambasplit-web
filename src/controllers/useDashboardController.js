@@ -28,6 +28,41 @@ export function useDashboardController({
   const [inviteCandidatesLoading, setInviteCandidatesLoading] = useState(false);
   const [groupOwnershipById, setGroupOwnershipById] = useState({});
 
+  function normalizeEmail(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function mergeSentInvites(existingInvites, incomingInvites) {
+    const map = new Map();
+    [...existingInvites, ...incomingInvites].forEach((invite) => {
+      const key = `${invite.groupId || ""}:${normalizeEmail(invite.email)}`;
+      const current = map.get(key);
+      if (!current) {
+        map.set(key, invite);
+        return;
+      }
+
+      const currentHasToken = Boolean(current.token);
+      const inviteHasToken = Boolean(invite.token);
+      if (!currentHasToken && inviteHasToken) {
+        map.set(key, invite);
+        return;
+      }
+
+      const currentTime = new Date(current.createdAt || 0).getTime();
+      const inviteTime = new Date(invite.createdAt || 0).getTime();
+      if (Number.isFinite(inviteTime) && inviteTime > currentTime) {
+        map.set(key, invite);
+      }
+    });
+
+    return [...map.values()].sort((a, b) => {
+      const aTime = new Date(a.createdAt || 0).getTime();
+      const bTime = new Date(b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
+  }
+
   useEffect(() => {
     setGroupOwnershipById({});
   }, [currentId]);
@@ -125,12 +160,18 @@ export function useDashboardController({
               email: user.email
             }))
         : [];
-      setInviteCandidates(normalized);
+      const existingInviteEmailSet = new Set(
+        sentInvites
+          .filter((invite) => invite.groupId === groupId)
+          .map((invite) => normalizeEmail(invite.email))
+      );
+      const filtered = normalized.filter((candidate) => !existingInviteEmailSet.has(normalizeEmail(candidate.email)));
+      setInviteCandidates(filtered);
       setInviteEmail((prev) => {
-        if (prev && normalized.some((candidate) => candidate.email === prev)) {
+        if (prev && filtered.some((candidate) => candidate.email === prev)) {
           return prev;
         }
-        return normalized[0]?.email || "";
+        return filtered[0]?.email || "";
       });
     } catch {
       setInviteCandidates([]);
@@ -138,11 +179,53 @@ export function useDashboardController({
     } finally {
       setInviteCandidatesLoading(false);
     }
+  }, [sentInvites]);
+
+  const loadGroupSentInvites = useCallback(async (groupId) => {
+    if (!groupId || !getAccessToken()) {
+      return;
+    }
+
+    try {
+      const invites = await groupService.listGroupInvites(groupId);
+      const normalized = Array.isArray(invites)
+        ? invites.map((invite) => ({
+            id: invite.id || `${invite.groupId}:${invite.email}`,
+            groupId: invite.groupId || groupId,
+            groupName: "Group",
+            email: invite.email,
+            expiresAt: invite.expiresAt,
+            createdAt: invite.createdAt,
+            token: null
+          }))
+        : [];
+      setSentInvites((prev) => {
+        const next = mergeSentInvites(prev, normalized);
+        if (next.length !== prev.length) return next;
+        const changed = next.some((invite, index) => {
+          const current = prev[index];
+          if (!current) return true;
+          return invite.id !== current.id
+            || invite.groupId !== current.groupId
+            || invite.email !== current.email
+            || invite.expiresAt !== current.expiresAt
+            || invite.createdAt !== current.createdAt
+            || invite.token !== current.token;
+        });
+        return changed ? next : prev;
+      });
+    } catch {
+      // Keep existing local sent invites if list endpoint is unavailable.
+    }
   }, []);
 
   useEffect(() => {
     loadInviteCandidates(selectedGroupId);
   }, [selectedGroupId, loadInviteCandidates]);
+
+  useEffect(() => {
+    loadGroupSentInvites(selectedGroupId);
+  }, [selectedGroupId, loadGroupSentInvites]);
 
   async function onCreateGroup(e) {
     e.preventDefault();
@@ -174,21 +257,42 @@ export function useDashboardController({
     setSuccess("");
     setBusy(true);
     try {
-      const invite = await groupService.createInvite(selectedGroupId, inviteEmail.trim());
+      const requestedEmail = inviteEmail.trim();
+      const invite = await groupService.createInvite(selectedGroupId, requestedEmail);
       const groupName = groups.find((group) => group.id === selectedGroupId)?.name || "Group";
       setInviteResult(invite);
       setSentInvites((prev) => [{
         id: invite.token,
         groupId: selectedGroupId,
         groupName,
-        email: invite.email,
+        email: requestedEmail,
         expiresAt: invite.expiresAt,
         createdAt: new Date().toISOString(),
         token: invite.token
       }, ...prev]);
+      await loadGroupSentInvites(selectedGroupId);
+      setInviteCandidates((prev) => {
+        const next = prev.filter((candidate) => normalizeEmail(candidate.email) !== normalizeEmail(requestedEmail));
+        setInviteEmail((current) => {
+          if (normalizeEmail(current) !== normalizeEmail(requestedEmail)) return current;
+          return next[0]?.email || "";
+        });
+        return next;
+      });
       setSuccess("Invite created.");
     } catch (err) {
       setInviteResult(null);
+      if (err?.status === 409) {
+        const details = (err.message || "").toLowerCase();
+        const specificReason = details.includes("already pending")
+          ? "an active invite already exists for this group."
+          : details.includes("already a member")
+          ? "this user is already a member of the group."
+          : "an active invite already exists for this group, or the user is already a member.";
+        setError(`Could not create invite for ${inviteEmail.trim()}: ${specificReason}`);
+        await loadGroupSentInvites(selectedGroupId);
+        return;
+      }
       setError(err.message || "Could not create invite.");
     } finally {
       setBusy(false);
@@ -239,6 +343,7 @@ export function useDashboardController({
     try {
       await groupService.cancelInvite(invite.groupId, invite.token);
       setSentInvites((prev) => prev.filter((item) => item.id !== invite.id));
+      await loadGroupSentInvites(invite.groupId);
       setSuccess("Invite deleted.");
     } catch (err) {
       setError(err.message || "Could not delete invite.");

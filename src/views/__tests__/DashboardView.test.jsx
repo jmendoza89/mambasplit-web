@@ -104,12 +104,35 @@ describe("DashboardView", () => {
 
     expect(screen.getAllByText("Trip").length).toBeGreaterThan(0);
     expect(screen.getAllByText("u@example.com").length).toBeGreaterThan(0);
+    expect(screen.getByText("To:")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(onAcceptPendingInvite).toHaveBeenCalledTimes(1);
     expect(onRefreshPendingInvites).toHaveBeenCalledTimes(1);
     expect(onDeleteInvite).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not render the last token section", () => {
+    renderView({
+      sentInvites: [{
+        id: "sent-1",
+        groupId: "group-1",
+        groupName: "Trip",
+        email: "friend@example.com",
+        token: "token-1",
+        expiresAt: "2026-03-01T00:00:00Z",
+        createdAt: "2026-02-25T00:00:00Z"
+      }],
+      inviteResult: {
+        token: "token-1",
+        email: "friend@example.com",
+        expiresAt: "2026-03-01T00:00:00Z"
+      }
+    });
+
+    expect(screen.queryByText("Last Token:")).not.toBeInTheDocument();
+    expect(screen.getByText("To:")).toBeInTheDocument();
   });
 
   it("shows owner and member chips in groups list", () => {

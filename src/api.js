@@ -159,6 +159,7 @@ export const groupsApi = {
   createSettlement: (groupId, payload) => api(`/api/v1/groups/${groupId}/settlements`, "POST", payload),
   listSettlements: (groupId) => api(`/api/v1/groups/${groupId}/settlements`),
   createInvite: (groupId, email) => api(`/api/v1/groups/${groupId}/invites`, "POST", { email }),
+  listGroupInvites: (groupId) => api(`/api/v1/groups/${groupId}/invites`),
   cancelInvite: (groupId, token) => api(`/api/v1/groups/${groupId}/invites/${encodeURIComponent(token)}`, "DELETE"),
   acceptInvite: (token) => api("/api/v1/invites/accept", "POST", { token })
 };
