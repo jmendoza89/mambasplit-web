@@ -19,7 +19,7 @@ const expenses = [
 describe("SettleUpModal", () => {
   afterEach(() => cleanup());
 
-  it("prefills amount from total recent expenses", async () => {
+  it("prefills amount from current-user applicable values", async () => {
     render(
       <SettleUpModal
         isOpen
@@ -31,6 +31,28 @@ describe("SettleUpModal", () => {
         settlementSuggestions={[{
           fromUserId: members[1].id,
           toUserId: members[0].id,
+          amountCents: 6400
+        }]}
+        groupName="Trip"
+        onSaveSettlement={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByLabelText("Settlement amount")[0]).toHaveValue("12.00");
+  });
+
+  it("prefills amount from suggestion when current user is the payer", async () => {
+    render(
+      <SettleUpModal
+        isOpen
+        onClose={vi.fn()}
+        currentUserId={members[0].id}
+        currentUserName="Alex"
+        members={members}
+        expenses={expenses}
+        settlementSuggestions={[{
+          fromUserId: members[0].id,
+          toUserId: members[1].id,
           amountCents: 6400
         }]}
         groupName="Trip"
