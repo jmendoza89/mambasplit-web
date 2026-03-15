@@ -39,6 +39,17 @@ export default function DashboardView({
     return checkGroupOwnership(group, currentId, currentEmail, groupOwnershipById);
   }
 
+  function canDeleteSentInvite(invite) {
+    return Boolean((invite?.id || invite?.token) && invite?.sentByUserId && invite.sentByUserId === currentId);
+  }
+
+  function deleteInviteActionTitle(invite) {
+    if (!invite?.sentByUserId) return "Invite sender is unavailable for this row.";
+    if (invite.sentByUserId !== currentId) return "Only the member who sent this invite can delete it.";
+    if (!invite?.id && !invite?.token) return "Invite identifier is unavailable for this row.";
+    return "Delete invite";
+  }
+
   return (
     <section className="dash-wrap">
       <article className="card panel">
@@ -155,7 +166,7 @@ export default function DashboardView({
                   <DashboardInviteCard
                     key={invite.id}
                     groupName={invite.groupName}
-                    email={invite.email}
+                    email={invite.sentToEmail ?? invite.email}
                     createdAt={formatTimestamp(invite.createdAt)}
                     expiresAt={formatTimestamp(invite.expiresAt)}
                     emailLabel="Email"
@@ -183,20 +194,20 @@ export default function DashboardView({
                 <DashboardInviteCard
                   key={invite.id}
                   groupName={invite.groupName}
-                  email={invite.email}
+                  email={invite.sentToEmail ?? invite.email}
                   createdAt={formatTimestamp(invite.createdAt)}
                   expiresAt={formatTimestamp(invite.expiresAt)}
                   emailLabel="To"
                   actionLabel="Delete"
                   onAction={() => onDeleteInvite(invite)}
-                  actionDisabled={busy || !invite.token}
-                  actionTitle={invite.token ? "Delete invite" : "Invite token unavailable"}
+                  actionDisabled={busy || !canDeleteSentInvite(invite)}
+                  actionTitle={deleteInviteActionTitle(invite)}
                   variant="sent"
                   highlighted={inviteResult?.token === invite.token}
                 />
               ))}
               {!sentInvites.length ? (
-                <li className="list-empty">No sent invites in this session</li>
+                <li className="list-empty">No sent invites</li>
               ) : null}
             </ul>
           </article>

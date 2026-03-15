@@ -160,6 +160,7 @@ export const groupsApi = {
   listSettlements: (groupId) => api(`/api/v1/groups/${groupId}/settlements`),
   createInvite: (groupId, email) => api(`/api/v1/groups/${groupId}/invites`, "POST", { email }),
   listGroupInvites: (groupId) => api(`/api/v1/groups/${groupId}/invites`),
+  cancelInviteById: (groupId, inviteId) => api(`/api/v1/groups/${groupId}/invites/by-id/${encodeURIComponent(inviteId)}`, "DELETE"),
   cancelInvite: (groupId, token) => api(`/api/v1/groups/${groupId}/invites/${encodeURIComponent(token)}`, "DELETE"),
   acceptInvite: (token) => api("/api/v1/invites/accept", "POST", { token })
 };
