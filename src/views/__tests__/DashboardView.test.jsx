@@ -75,6 +75,27 @@ describe("DashboardView", () => {
     expect(screen.getByText("No pending invites")).toBeInTheDocument();
   });
 
+  it("renders empty sent invite state", () => {
+    renderView({ sentInvites: [] });
+    expect(screen.getByText("No sent invites")).toBeInTheDocument();
+  });
+
+  it("renders sent invite recipient with legacy fallback", () => {
+    renderView({
+      sentInvites: [{
+        id: "sent-legacy-1",
+        groupId: "group-1",
+        groupName: "Trip",
+        email: "legacy@example.com",
+        token: "token-legacy-1",
+        expiresAt: "2026-03-01T00:00:00Z",
+        createdAt: "2026-02-25T00:00:00Z"
+      }]
+    });
+
+    expect(screen.getByText("legacy@example.com")).toBeInTheDocument();
+  });
+
   it("renders pending invites and refresh action", () => {
     const onRefreshPendingInvites = vi.fn();
     const onAcceptPendingInvite = vi.fn();
@@ -84,7 +105,7 @@ describe("DashboardView", () => {
         id: "invite-1",
         groupId: "group-1",
         groupName: "Trip",
-        email: "u@example.com",
+        sentToEmail: "u@example.com",
         expiresAt: "2026-03-01T00:00:00Z",
         createdAt: "2026-02-25T00:00:00Z"
       }],
@@ -92,7 +113,8 @@ describe("DashboardView", () => {
         id: "sent-1",
         groupId: "group-1",
         groupName: "Trip",
-        email: "friend@example.com",
+        sentToEmail: "friend@example.com",
+        sentByUserId: "00000000-0000-4000-8000-000000000001",
         token: "token-1",
         expiresAt: "2026-03-01T00:00:00Z",
         createdAt: "2026-02-25T00:00:00Z"
@@ -119,20 +141,76 @@ describe("DashboardView", () => {
         id: "sent-1",
         groupId: "group-1",
         groupName: "Trip",
-        email: "friend@example.com",
+        sentToEmail: "friend@example.com",
+        sentByUserId: "00000000-0000-4000-8000-000000000001",
         token: "token-1",
         expiresAt: "2026-03-01T00:00:00Z",
         createdAt: "2026-02-25T00:00:00Z"
       }],
       inviteResult: {
         token: "token-1",
-        email: "friend@example.com",
+        sentToEmail: "friend@example.com",
         expiresAt: "2026-03-01T00:00:00Z"
       }
     });
 
     expect(screen.queryByText("Last Token:")).not.toBeInTheDocument();
     expect(screen.getByText("To:")).toBeInTheDocument();
+  });
+
+  it("disables delete when sender does not match current member", () => {
+    renderView({
+      sentInvites: [{
+        id: "sent-1",
+        groupId: "group-1",
+        groupName: "Trip",
+        sentToEmail: "friend@example.com",
+        sentByUserId: "00000000-0000-4000-8000-000000000002",
+        token: "token-1",
+        expiresAt: "2026-03-01T00:00:00Z",
+        createdAt: "2026-02-25T00:00:00Z"
+      }]
+    });
+
+    const deleteButton = screen.getByRole("button", { name: "Delete" });
+    expect(deleteButton).toBeDisabled();
+    expect(deleteButton).toHaveAttribute("title", "Only the member who sent this invite can delete it.");
+  });
+
+  it("disables delete when sender is missing", () => {
+    renderView({
+      sentInvites: [{
+        id: "sent-1",
+        groupId: "group-1",
+        groupName: "Trip",
+        sentToEmail: "friend@example.com",
+        token: "token-1",
+        expiresAt: "2026-03-01T00:00:00Z",
+        createdAt: "2026-02-25T00:00:00Z"
+      }]
+    });
+
+    const deleteButton = screen.getByRole("button", { name: "Delete" });
+    expect(deleteButton).toBeDisabled();
+    expect(deleteButton).toHaveAttribute("title", "Invite sender is unavailable for this row.");
+  });
+
+  it("disables delete when invite identifier is missing", () => {
+    renderView({
+      sentInvites: [{
+        id: "",
+        groupId: "group-1",
+        groupName: "Trip",
+        sentToEmail: "friend@example.com",
+        sentByUserId: "00000000-0000-4000-8000-000000000001",
+        expiresAt: "2026-03-01T00:00:00Z",
+        createdAt: "2026-02-25T00:00:00Z"
+      }]
+    });
+
+    const deleteButton = screen.getByRole("button", { name: "Delete" });
+    expect(deleteButton).toBeDisabled();
+    expect(deleteButton).toHaveAttribute("title", "Invite identifier is unavailable for this row.");
   });
 
   it("shows owner and member chips in groups list", () => {

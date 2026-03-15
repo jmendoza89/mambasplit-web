@@ -20,6 +20,34 @@ function toIsoLocalDateTime(dateOnlyText) {
   return `${dateOnlyText}T00:00:00${sign}${hours}:${minutes}`;
 }
 
+function pairKey(fromUserId, toUserId) {
+  return `${fromUserId || ""}->${toUserId || ""}`;
+}
+
+function computePairBalanceCents(expenses, fromUserId, toUserId) {
+  if (!fromUserId || !toUserId) return 0;
+
+  let netCents = 0;
+  for (const expense of expenses || []) {
+    const splits = Array.isArray(expense?.splits) ? expense.splits : [];
+    if (expense?.payerUserId === toUserId) {
+      const owedByFrom = splits
+        .filter((split) => split?.userId === fromUserId)
+        .reduce((sum, split) => sum + (split?.amountOwedCents || 0), 0);
+      netCents += owedByFrom;
+    }
+
+    if (expense?.payerUserId === fromUserId) {
+      const owedByTo = splits
+        .filter((split) => split?.userId === toUserId)
+        .reduce((sum, split) => sum + (split?.amountOwedCents || 0), 0);
+      netCents -= owedByTo;
+    }
+  }
+
+  return Math.max(0, netCents);
+}
+
 export default function SettleUpModal({
   isOpen,
   onClose,
@@ -59,6 +87,26 @@ export default function SettleUpModal({
     ), 0),
     [autoSelectedExpenseIds, expenseById]
   );
+  const suggestionAmountByPair = useMemo(() => {
+    const map = new Map();
+    for (const suggestion of safeSuggestions) {
+      const key = pairKey(suggestion?.fromUserId, suggestion?.toUserId);
+      if (!key) continue;
+      map.set(key, suggestion?.amountCents || 0);
+    }
+    return map;
+  }, [safeSuggestions]);
+  const expectedPairAmountCents = useMemo(() => {
+    const fromToSuggestion = suggestionAmountByPair.get(pairKey(fromUserId, toUserId));
+    if (typeof fromToSuggestion === "number" && fromToSuggestion > 0) {
+      return fromToSuggestion;
+    }
+    const computedFromExpenses = computePairBalanceCents(safeExpenses, fromUserId, toUserId);
+    if (computedFromExpenses > 0) {
+      return computedFromExpenses;
+    }
+    return Math.max(0, autoSelectedExpenseTotalCents);
+  }, [suggestionAmountByPair, fromUserId, toUserId, safeExpenses, autoSelectedExpenseTotalCents]);
   const selectedFromMember = safeMembers.find((member) => member.id === fromUserId) || null;
   const selectedToMember = safeMembers.find((member) => member.id === toUserId) || null;
 
@@ -78,7 +126,7 @@ export default function SettleUpModal({
     if (firstSuggestion) {
       setFromUserId(firstSuggestion.fromUserId || "");
       setToUserId(firstSuggestion.toUserId || "");
-      setCashAmount((Math.max(0, autoSelectedExpenseTotalCents) / 100).toFixed(2));
+      setCashAmount((Math.max(0, firstSuggestion.amountCents || 0) / 100).toFixed(2));
       return;
     }
     const fallbackCounterparty = safeMembers.find((member) => member.id !== currentUserId);
@@ -86,6 +134,12 @@ export default function SettleUpModal({
     setToUserId(fallbackCounterparty?.id || "");
     setCashAmount((Math.max(0, autoSelectedExpenseTotalCents) / 100).toFixed(2));
   }, [isOpen, safeMembers, safeSuggestions, currentUserId, autoSelectedExpenseTotalCents]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!fromUserId || !toUserId) return;
+    setCashAmount((Math.max(0, expectedPairAmountCents) / 100).toFixed(2));
+  }, [isOpen, fromUserId, toUserId, expectedPairAmountCents]);
 
   const handleCashAmountChange = (event) => {
     const nextValue = event.target.value;
@@ -110,14 +164,19 @@ export default function SettleUpModal({
       return;
     }
 
+    if (autoSelectedExpenseIds.length === 0) {
+      setLocalError("No unsettled expenses are available to settle.");
+      return;
+    }
+
     if (!settlementDate) {
       setLocalError("Settlement date is required.");
       return;
     }
 
-    if (autoSelectedExpenseIds.length > 0 && amountCents !== autoSelectedExpenseTotalCents) {
+    if (expectedPairAmountCents > 0 && amountCents !== expectedPairAmountCents) {
       setLocalError(
-        `Settlement amount (${(amountCents / 100).toFixed(2)}) must match selected expenses (${(autoSelectedExpenseTotalCents / 100).toFixed(2)}).`
+        `Settlement amount (${(amountCents / 100).toFixed(2)}) must match outstanding balance (${(expectedPairAmountCents / 100).toFixed(2)}).`
       );
       return;
     }
