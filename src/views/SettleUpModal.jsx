@@ -122,17 +122,15 @@ export default function SettleUpModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const firstSuggestion = safeSuggestions[0];
-    if (firstSuggestion) {
-      setFromUserId(firstSuggestion.fromUserId || "");
-      setToUserId(firstSuggestion.toUserId || "");
-      setCashAmount((Math.max(0, firstSuggestion.amountCents || 0) / 100).toFixed(2));
-      return;
-    }
+    const currentUserSuggestion = safeSuggestions.find(
+      (suggestion) => suggestion?.fromUserId === currentUserId
+    );
     const fallbackCounterparty = safeMembers.find((member) => member.id !== currentUserId);
     setFromUserId(currentUserId || "");
-    setToUserId(fallbackCounterparty?.id || "");
-    setCashAmount((Math.max(0, autoSelectedExpenseTotalCents) / 100).toFixed(2));
+    setToUserId(currentUserSuggestion?.toUserId || fallbackCounterparty?.id || "");
+    setCashAmount(
+      (Math.max(0, currentUserSuggestion?.amountCents || autoSelectedExpenseTotalCents) / 100).toFixed(2)
+    );
   }, [isOpen, safeMembers, safeSuggestions, currentUserId, autoSelectedExpenseTotalCents]);
 
   useEffect(() => {
@@ -148,13 +146,19 @@ export default function SettleUpModal({
   };
 
   const handleSave = async () => {
+    const effectiveFromUserId = currentUserId || "";
     const amountCents = Math.round(Number(cashAmount || "0") * 100);
-    if (!fromUserId || !toUserId) {
+    if (!effectiveFromUserId) {
+      setLocalError("Could not determine current user id for payer.");
+      return;
+    }
+
+    if (!toUserId) {
       setLocalError("Select both payer and receiver.");
       return;
     }
 
-    if (fromUserId === toUserId) {
+    if (effectiveFromUserId === toUserId) {
       setLocalError("Payer and receiver must be different members.");
       return;
     }
@@ -185,7 +189,7 @@ export default function SettleUpModal({
     setSaving(true);
     try {
       const result = await onSaveSettlement({
-        fromUserId,
+        fromUserId: effectiveFromUserId,
         toUserId,
         amountCents,
         expenseIds: autoSelectedExpenseIds,
@@ -259,12 +263,9 @@ export default function SettleUpModal({
                   <select
                     id="settlementFromUser"
                     value={fromUserId}
-                    onChange={(event) => setFromUserId(event.target.value)}
+                    disabled
                   >
-                    <option value="">Select payer</option>
-                    {safeMembers.map((member) => (
-                      <option key={member.id} value={member.id}>{member.name}</option>
-                    ))}
+                    <option value={currentUserId || ""}>{selectedFromMember?.name || currentUserName || "You"}</option>
                   </select>
                 </div>
 
