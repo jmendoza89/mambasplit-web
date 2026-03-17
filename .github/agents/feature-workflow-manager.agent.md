@@ -29,9 +29,13 @@ You automate end-to-end feature workflow lifecycle operations.
 	- run commit-sync first,
 	- open PR from current branch to develop,
 	- generate conventional PR title using branch-prefix mapping (feature->feat, bugfix/hotfix->fix, chore->chore),
-	- generate PR description with summary, affected files/modules, tests/validation, and issue-closing keyword when applicable,
+	- generate PR description with summary, affected files/modules, tests/validation, issue-closing keyword when applicable, and Release/newsletter notes,
 	- report PR link and concise change summary,
 	- if next issue number is provided, chain into start flow.
+5. For develop-to-main PR generation:
+	- review all changes committed between develop and main before drafting the PR,
+	- summarize the full release scope in the PR description,
+	- include Release/newsletter notes suitable for customer-facing release announcements.
 
 ## Guardrails
 - Do not push directly to develop or main.

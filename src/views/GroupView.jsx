@@ -41,6 +41,7 @@ export default function GroupView({
 }) {
   const { currentId, currentName, onLogout } = useAuth();
   const { busy } = useAlerts();
+  const showBalanceDiagnostics = false;
   const [collapsedSettlementIds, setCollapsedSettlementIds] = useState({});
   const activeExpenses = useMemo(() => {
     const hiddenIds = new Set();
@@ -216,7 +217,7 @@ export default function GroupView({
           isGroupOwner={isGroupOwner}
         />
 
-        {balanceDiagnostics.rows.length ? (
+        {showBalanceDiagnostics && balanceDiagnostics.rows.length ? (
           <section className={`group-diagnostics ${balanceDiagnostics.hasMismatch ? "has-mismatch" : "is-clean"}`.trim()}>
             <div className="group-diagnostics-head">
               <strong>Balance Diagnostics</strong>
