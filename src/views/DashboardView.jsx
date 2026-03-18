@@ -4,11 +4,7 @@ import { isGroupOwner as checkGroupOwnership } from "../utils/groupOwnership";
 import DashboardEmptyState from "./components/DashboardEmptyState";
 import DashboardGroupCardItem from "./components/DashboardGroupCardItem";
 import DashboardHero from "./components/DashboardHero";
-import DashboardEmptyState from "./components/DashboardEmptyState";
-import DashboardGroupCardItem from "./components/DashboardGroupCardItem";
-import DashboardHero from "./components/DashboardHero";
 import DashboardInviteCard from "./components/DashboardInviteCard";
-import DashboardSentInviteCard from "./components/DashboardSentInviteCard";
 import DashboardSentInviteCard from "./components/DashboardSentInviteCard";
 
 export default function DashboardView({
@@ -25,17 +21,17 @@ export default function DashboardView({
   inviteCandidatesLoading = false,
   groupOwnershipById = {},
   onOpenGroupPage,
+  onOpenAccount,
   onCreateGroup,
   onCreateInvite,
   onAcceptPendingInvite,
   onDeleteInvite,
   onRefreshPendingInvites,
-  onStartPasswordReset,
   setSelectedGroupId,
   setNewGroupName,
   setInviteEmail
 }) {
-  const { currentName, currentEmail, currentId, onLogout } = useAuth();
+  const { currentName, currentEmail, currentId, currentAvatarUrl, onLogout } = useAuth();
   const { busy } = useAlerts();
 
   function formatTimestamp(value) {
@@ -70,7 +66,9 @@ export default function DashboardView({
           busy={busy}
           pendingInvitesLoading={pendingInvitesLoading}
           onOpenGroupPage={onOpenGroupPage}
+          onOpenAccount={onOpenAccount}
           onRefreshPendingInvites={onRefreshPendingInvites}
+          currentAvatarUrl={currentAvatarUrl}
           onLogout={onLogout}
         />
 

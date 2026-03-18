@@ -7,6 +7,7 @@ import AuthView from "./views/AuthView";
 import DashboardView from "./views/DashboardView";
 import ExpenseModal from "./views/ExpenseModal";
 import GroupView from "./views/GroupView";
+import AccountView from "./views/AccountView";
 import { itemVariants, listVariants } from "./views/animations";
 import Alerts from "./views/components/Alerts";
 import Header from "./views/components/Header";
@@ -21,7 +22,9 @@ export default function App() {
     isAuthenticated: state.isAuthenticated,
     currentName: state.currentName,
     currentEmail: state.currentEmail,
+    currentPhone: state.currentPhone,
     currentId: state.currentId,
+    currentAvatarUrl: state.currentAvatarUrl,
     authMode: state.authMode,
     email: state.email,
     password: state.password,
@@ -51,7 +54,9 @@ export default function App() {
     state.isAuthenticated,
     state.currentName,
     state.currentEmail,
+    state.currentPhone,
     state.currentId,
+    state.currentAvatarUrl,
     state.authMode,
     state.email,
     state.password,
@@ -137,6 +142,7 @@ export default function App() {
             inviteCandidatesLoading={state.inviteCandidatesLoading}
             groupOwnershipById={state.groupOwnershipById}
             onOpenGroupPage={actions.onOpenGroupPage}
+            onOpenAccount={() => actions.setActiveView("account")}
             onCreateGroup={actions.onCreateGroup}
             onCreateInvite={actions.onCreateInvite}
             onAcceptPendingInvite={actions.onAcceptPendingInvite}
@@ -146,6 +152,16 @@ export default function App() {
             setSelectedGroupId={actions.setSelectedGroupId}
             setNewGroupName={actions.setNewGroupName}
             setInviteEmail={actions.setInviteEmail}
+          />
+        ) : state.activeView === "account" ? (
+          <AccountView
+            currentName={state.currentName}
+            currentEmail={state.currentEmail}
+            currentPhone={state.currentPhone}
+            currentAvatarUrl={state.currentAvatarUrl}
+            busy={state.busy}
+            onBackToDashboard={() => actions.setActiveView("dashboard")}
+            onSaveAccountProfile={actions.onSaveAccountProfile}
           />
         ) : (
           <GroupView

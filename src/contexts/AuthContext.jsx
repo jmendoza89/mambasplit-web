@@ -12,7 +12,9 @@ export const AuthContext = createContext({
   // Computed user info
   currentName: "User",
   currentEmail: "-",
+  currentPhone: "",
   currentId: "-",
+  currentAvatarUrl: "",
   
   // Auth form state
   authMode: "login",

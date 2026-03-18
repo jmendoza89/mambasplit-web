@@ -11,6 +11,20 @@ import { useAuthController } from "./useAuthController";
 import { useDashboardController } from "./useDashboardController";
 import { useGroupController } from "./useGroupController";
 
+const PROFILE_STORAGE_KEY = "mambasplit_account_profile";
+
+function getStoredProfile() {
+  const fallback = { displayName: "", email: "", phone: "", avatarUrl: "" };
+  const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
+  if (!raw) return fallback;
+
+  try {
+    return { ...fallback, ...JSON.parse(raw) };
+  } catch {
+    return fallback;
+  }
+}
+
 export function useAppController() {
   const [authMode, setAuthMode] = useState("login");
   const [loading, setLoading] = useState(true);
@@ -36,15 +50,54 @@ export function useAppController() {
   const [resetTokenStatus, setResetTokenStatus] = useState("idle");
   const [passwordResetOutbox, setPasswordResetOutbox] = useState(null);
   const [passwordResetTestValue, setPasswordResetTestValue] = useState("");
+<<<<<<< HEAD
+=======
+  const [accountProfile, setAccountProfile] = useState(() => getStoredProfile());
+>>>>>>> 4de936c (Add account dropdown and profile page)
 
-  const currentName = useMemo(() => (me && me.displayName) || (user && user.displayName) || "User", [me, user]);
-  const currentEmail = useMemo(() => (me && me.email) || (user && user.email) || "-", [me, user]);
+  const currentName = useMemo(
+    () => accountProfile.displayName || (me && me.displayName) || (user && user.displayName) || "User",
+    [accountProfile.displayName, me, user]
+  );
+  const currentEmail = useMemo(
+    () => accountProfile.email || (me && me.email) || (user && user.email) || "-",
+    [accountProfile.email, me, user]
+  );
+  const currentPhone = useMemo(() => accountProfile.phone || "", [accountProfile.phone]);
   const currentId = useMemo(() => (me && me.id) || (user && user.id) || "-", [me, user]);
+<<<<<<< HEAD
+=======
+  const currentAvatarUrl = useMemo(() => accountProfile.avatarUrl || "", [accountProfile.avatarUrl]);
+>>>>>>> 4de936c (Add account dropdown and profile page)
   const showResetTestHarness = useMemo(
     () => import.meta.env.MODE !== "production" || import.meta.env.VITE_ENABLE_RESET_TEST_HARNESS === "true",
     []
   );
   const isResetAuthMode = authMode === "resetRequest" || authMode === "resetPassword";
+<<<<<<< HEAD
+=======
+
+  useEffect(() => {
+    setAccountProfile((prev) => {
+      const baseDisplayName = me?.displayName || user?.displayName || "";
+      const baseEmail = me?.email || user?.email || "";
+      const isDifferentUser = Boolean(prev.email && baseEmail && prev.email !== baseEmail);
+      const next = {
+        displayName: isDifferentUser ? baseDisplayName : (prev.displayName || baseDisplayName),
+        email: isDifferentUser ? baseEmail : (prev.email || baseEmail),
+        phone: isDifferentUser ? "" : (prev.phone || ""),
+        avatarUrl: isDifferentUser ? "" : (prev.avatarUrl || "")
+      };
+
+      if (JSON.stringify(next) === JSON.stringify(prev)) {
+        return prev;
+      }
+
+      window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, [me, user]);
+>>>>>>> 4de936c (Add account dropdown and profile page)
 
   const loadSessionData = useCallback(async () => {
     const { me: meData, groups: groupData } = await fetchSessionData();
@@ -243,6 +296,37 @@ export function useAppController() {
     }
   }, [password, resetConfirmPassword, resetToken]);
 
+<<<<<<< HEAD
+=======
+  const onSaveAccountProfile = useCallback((nextProfile) => {
+    const normalized = {
+      displayName: (nextProfile?.displayName || "").trim(),
+      email: (nextProfile?.email || "").trim(),
+      phone: (nextProfile?.phone || "").trim(),
+      avatarUrl: nextProfile?.avatarUrl || ""
+    };
+
+    setAccountProfile(normalized);
+    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(normalized));
+    setUser((prev) => (prev ? {
+      ...prev,
+      displayName: normalized.displayName || prev.displayName,
+      email: normalized.email || prev.email,
+      phone: normalized.phone,
+      avatarUrl: normalized.avatarUrl
+    } : prev));
+    setMe((prev) => (prev ? {
+      ...prev,
+      displayName: normalized.displayName || prev.displayName,
+      email: normalized.email || prev.email,
+      phone: normalized.phone,
+      avatarUrl: normalized.avatarUrl
+    } : prev));
+    setSuccess("Account details updated on this device.");
+    setError("");
+  }, [setError, setSuccess, setUser, setMe]);
+
+>>>>>>> 4de936c (Add account dropdown and profile page)
   return {
     state: {
       authMode,
@@ -251,13 +335,17 @@ export function useAppController() {
       error,
       success,
       busy,
+      user,
+      me,
       isAuthenticated: authController.isAuthenticated,
       activeView,
       groups,
       selectedGroupId,
       currentName,
       currentEmail,
+      currentPhone,
       currentId,
+      currentAvatarUrl,
       groupLoading: groupController.state.groupLoading,
       groupError: groupController.state.groupError || groupError,
       isGroupOwner: groupController.state.isGroupOwner,
@@ -326,6 +414,10 @@ export function useAppController() {
       onRequestPasswordReset,
       onOpenPasswordResetLink,
       onSubmitPasswordReset,
+<<<<<<< HEAD
+=======
+      onSaveAccountProfile,
+>>>>>>> 4de936c (Add account dropdown and profile page)
       onCreateGroup: dashboardController.actions.onCreateGroup,
       onCreateInvite: dashboardController.actions.onCreateInvite,
       onAcceptPendingInvite: dashboardController.actions.onAcceptPendingInvite,

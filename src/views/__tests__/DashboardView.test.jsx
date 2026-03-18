@@ -18,6 +18,7 @@ function renderView(overrideProps = {}, contextOverrides = {}) {
     pendingInvitesError: "",
     groupOwnershipById: {},
     onOpenGroupPage: vi.fn(),
+    onOpenAccount: vi.fn(),
     onCreateGroup: vi.fn((e) => e.preventDefault()),
     onCreateInvite: vi.fn((e) => e.preventDefault()),
     onAcceptPendingInvite: vi.fn(),
@@ -33,6 +34,7 @@ function renderView(overrideProps = {}, contextOverrides = {}) {
     currentName: "User",
     currentEmail: "u@example.com",
     currentId: "00000000-0000-4000-8000-000000000001",
+    currentAvatarUrl: "",
     onLogout: vi.fn(),
     ...contextOverrides.auth
   };
@@ -133,6 +135,16 @@ describe("DashboardView", () => {
     expect(onAcceptPendingInvite).toHaveBeenCalledTimes(1);
     expect(onRefreshPendingInvites).toHaveBeenCalledTimes(1);
     expect(onDeleteInvite).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the account dropdown and navigates to the account page", () => {
+    const onOpenAccount = vi.fn();
+    renderView({ onOpenAccount });
+
+    fireEvent.click(screen.getByRole("button", { name: "User" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Your Account" }));
+
+    expect(onOpenAccount).toHaveBeenCalledTimes(1);
   });
 
   it("does not render the last token section", () => {

@@ -1,15 +1,32 @@
+import { useEffect, useRef, useState } from "react";
 import { initials } from "../../utils/formatters";
 
 export default function DashboardHero({
   currentName,
   currentEmail,
+  currentAvatarUrl,
   selectedGroupId,
   busy,
   pendingInvitesLoading,
   onOpenGroupPage,
+  onOpenAccount,
   onRefreshPendingInvites,
   onLogout
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (!menuRef.current?.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("mousedown", handlePointerDown);
+    return () => window.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
   return (
     <section className="dashboard-hero card">
       <div className="dashboard-hero-head">
@@ -20,7 +37,6 @@ export default function DashboardHero({
         </div>
 
         <div className="dashboard-hero-side">
-          <div className="avatar dashboard-hero-avatar" aria-hidden="true">{initials(currentName)}</div>
           <div className="dash-top-actions">
             <button
               className="btn-secondary"
@@ -41,6 +57,38 @@ export default function DashboardHero({
             <button className="btn-ghost" type="button" onClick={onLogout} disabled={busy}>
               Logout
             </button>
+            <div className="account-menu" ref={menuRef}>
+              <button
+                className="account-menu-trigger"
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((prev) => !prev)}
+              >
+                {currentAvatarUrl ? (
+                  <img className="account-menu-avatar-image" src={currentAvatarUrl} alt="" aria-hidden="true" />
+                ) : (
+                  <span className="avatar dashboard-hero-avatar" aria-hidden="true">{initials(currentName)}</span>
+                )}
+                <span className="account-menu-name">{currentName}</span>
+              </button>
+
+              {menuOpen ? (
+                <div className="account-menu-dropdown" role="menu">
+                  <button
+                    type="button"
+                    className="account-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onOpenAccount();
+                    }}
+                  >
+                    Your Account
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
