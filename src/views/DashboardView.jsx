@@ -1,11 +1,7 @@
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
 import { isGroupOwner as checkGroupOwnership } from "../utils/groupOwnership";
-import DashboardEmptyState from "./components/DashboardEmptyState";
-import DashboardGroupCardItem from "./components/DashboardGroupCardItem";
-import DashboardHero from "./components/DashboardHero";
 import DashboardInviteCard from "./components/DashboardInviteCard";
-import DashboardSentInviteCard from "./components/DashboardSentInviteCard";
 
 export default function DashboardView({
   selectedGroupId,
@@ -26,14 +22,12 @@ export default function DashboardView({
   onAcceptPendingInvite,
   onDeleteInvite,
   onRefreshPendingInvites,
-  onStartPasswordReset,
   setSelectedGroupId,
   setNewGroupName,
   setInviteEmail
 }) {
   const { currentName, currentEmail, currentId, onLogout } = useAuth();
   const { busy } = useAlerts();
-
   function formatTimestamp(value) {
     if (!value) return "-";
     const parsed = new Date(value);
@@ -59,17 +53,48 @@ export default function DashboardView({
   return (
     <section className="dash-wrap">
       <article className="card panel">
-        <DashboardHero
-          currentName={currentName}
-          currentEmail={currentEmail}
-          selectedGroupId={selectedGroupId}
-          busy={busy}
-          pendingInvitesLoading={pendingInvitesLoading}
-          onOpenGroupPage={onOpenGroupPage}
-          onRefreshPendingInvites={onRefreshPendingInvites}
-          onStartPasswordReset={onStartPasswordReset}
-          onLogout={onLogout}
-        />
+        <div className="dash-top">
+          <div>
+            <h2>Welcome, {currentName}</h2>
+            <p>React test dashboard for groups and invite workflows.</p>
+          </div>
+          <div className="dash-top-actions">
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={() => onOpenGroupPage(selectedGroupId)}
+              disabled={!selectedGroupId || busy}
+            >
+              Open Group Page
+            </button>
+            <button
+              type="button"
+              className="btn-inline"
+              onClick={onRefreshPendingInvites}
+              disabled={busy || pendingInvitesLoading}
+            >
+              Refresh
+            </button>
+            <button className="btn-ghost" type="button" onClick={onLogout} disabled={busy}>
+              Logout
+            </button>
+          </div>
+        </div>
+
+        <div className="grid">
+          <section className="card stat">
+            <h4>Display Name</h4>
+            <strong>{currentName}</strong>
+          </section>
+          <section className="card stat">
+            <h4>Email</h4>
+            <strong>{currentEmail}</strong>
+          </section>
+          <section className="card stat">
+            <h4>User ID</h4>
+            <strong>{currentId}</strong>
+          </section>
+        </div>
 
         <div className="workspace-grid">
           <article className="card panel section-panel">
@@ -90,24 +115,38 @@ export default function DashboardView({
 
             <ul className="list group-list">
               {groups.map((group) => (
-                <DashboardGroupCardItem
+                <li
                   key={group.id}
-                  group={group}
-                  isOwned={isOwnedGroup(group)}
-                  isActive={group.id === selectedGroupId}
-                  onSelect={setSelectedGroupId}
-                  onOpen={onOpenGroupPage}
-                />
+                  className={[
+                    group.id === selectedGroupId ? "is-active" : "",
+                    isOwnedGroup(group) ? "group-owner" : "group-member"
+                  ].filter(Boolean).join(" ")}
+                >
+                  <div className="list-row">
+                    <button
+                      type="button"
+                      className="list-btn"
+                      onClick={() => setSelectedGroupId(group.id)}
+                    >
+                      <span className="group-name-stack">
+                        <span>{group.name}</span>
+                        <span className={`group-role-chip ${isOwnedGroup(group) ? "chip-owner" : "chip-member"}`}>
+                          {isOwnedGroup(group) ? "Owner" : "Member"}
+                        </span>
+                      </span>
+                      <code>{group.id.slice(0, 8)}...</code>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-inline"
+                      onClick={() => onOpenGroupPage(group.id)}
+                    >
+                      View
+                    </button>
+                  </div>
+                </li>
               ))}
-              {!groups.length ? (
-                <DashboardEmptyState
-                  as="li"
-                  className="list-empty dashboard-empty-state-inline"
-                  title="No groups yet. Create one to start inviting."
-                  detail="Create your first group to begin tracking expenses and invites."
-                  icon="+"
-                />
-              ) : null}
+              {!groups.length ? <li className="list-empty">No groups yet. Create one to start inviting.</li> : null}
             </ul>
           </article>
 
@@ -117,25 +156,9 @@ export default function DashboardView({
               <span className="panel-header-placeholder" aria-hidden="true" />
             </div>
 
-            {pendingInvitesLoading ? (
-              <DashboardEmptyState
-                as="div"
-                className="list-empty list-empty-inline dashboard-empty-state-inline"
-                title="Loading pending invites..."
-                detail="Checking for invites sent to your email."
-                icon="o"
-              />
-            ) : null}
+            {pendingInvitesLoading ? <p className="list-empty list-empty-inline">Loading pending invites...</p> : null}
 
-            {!pendingInvitesLoading && pendingInvitesError ? (
-              <DashboardEmptyState
-                as="div"
-                className="list-empty list-empty-inline dashboard-empty-state-inline"
-                title={pendingInvitesError}
-                detail="Try refreshing to fetch the latest pending invites."
-                icon="!"
-              />
-            ) : null}
+            {!pendingInvitesLoading && pendingInvitesError ? <p className="list-empty list-empty-inline">{pendingInvitesError}</p> : null}
 
             {!pendingInvitesLoading && !pendingInvitesError ? (
               <ul className="list dashboard-invite-list">
@@ -154,13 +177,7 @@ export default function DashboardView({
                   />
                 ))}
                 {!pendingInvites.length ? (
-                  <DashboardEmptyState
-                    as="li"
-                    className="list-empty dashboard-empty-state-inline"
-                    title="No pending invites"
-                    detail="You are all caught up right now."
-                    icon="v"
-                  />
+                  <li className="list-empty">No pending invites</li>
                 ) : null}
               </ul>
             ) : null}
@@ -174,27 +191,23 @@ export default function DashboardView({
             </div>
             <ul className="list dashboard-invite-list">
               {sentInvites.map((invite) => (
-                <DashboardSentInviteCard
+                <DashboardInviteCard
                   key={invite.id}
                   groupName={invite.groupName}
                   email={invite.sentToEmail ?? invite.email}
                   createdAt={formatTimestamp(invite.createdAt)}
                   expiresAt={formatTimestamp(invite.expiresAt)}
+                  emailLabel="To"
                   actionLabel="Delete"
                   onAction={() => onDeleteInvite(invite)}
                   actionDisabled={busy || !canDeleteSentInvite(invite)}
                   actionTitle={deleteInviteActionTitle(invite)}
+                  variant="sent"
                   highlighted={inviteResult?.token === invite.token}
                 />
               ))}
               {!sentInvites.length ? (
-                <DashboardEmptyState
-                  as="li"
-                  className="list-empty dashboard-empty-state-inline"
-                  title="No sent invites"
-                  detail="Create an invite to bring members into a group."
-                  icon="@"
-                />
+                <li className="list-empty">No sent invites</li>
               ) : null}
             </ul>
           </article>

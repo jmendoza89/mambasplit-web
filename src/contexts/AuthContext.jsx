@@ -18,28 +18,17 @@ export const AuthContext = createContext({
   authMode: "login",
   email: "",
   password: "",
-  resetConfirmPassword: "",
-  resetTokenStatus: "idle",
-  passwordResetOutbox: null,
-  passwordResetTestValue: "",
-  showResetTestHarness: false,
   displayName: "",
   
   // Auth actions
   setAuthMode: () => {},
   setEmail: () => {},
   setPassword: () => {},
-  setResetConfirmPassword: () => {},
   setDisplayName: () => {},
   onSubmitAuth: () => {},
   onGoogleLogin: () => {},
   onLogout: () => {},
-  onToggleAuthMode: () => {},
-  onStartPasswordReset: () => {},
-  onReturnToLogin: () => {},
-  onRequestPasswordReset: () => {},
-  onOpenPasswordResetLink: () => {},
-  onSubmitPasswordReset: () => {}
+  onToggleAuthMode: () => {}
 });
 
 /**

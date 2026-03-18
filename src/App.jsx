@@ -25,26 +25,15 @@ export default function App() {
     authMode: state.authMode,
     email: state.email,
     password: state.password,
-    resetConfirmPassword: state.resetConfirmPassword,
-    resetTokenStatus: state.resetTokenStatus,
-    passwordResetOutbox: state.passwordResetOutbox,
-    passwordResetTestValue: state.passwordResetTestValue,
-    showResetTestHarness: state.showResetTestHarness,
     displayName: state.displayName,
     setAuthMode: actions.setAuthMode,
     setEmail: actions.setEmail,
     setPassword: actions.setPassword,
-    setResetConfirmPassword: actions.setResetConfirmPassword,
     setDisplayName: actions.setDisplayName,
     onSubmitAuth: actions.onSubmitAuth,
     onGoogleLogin: actions.onGoogleLogin,
     onLogout: actions.onLogout,
-    onToggleAuthMode: actions.onToggleAuthMode,
-    onStartPasswordReset: actions.onStartPasswordReset,
-    onReturnToLogin: actions.onReturnToLogin,
-    onRequestPasswordReset: actions.onRequestPasswordReset,
-    onOpenPasswordResetLink: actions.onOpenPasswordResetLink,
-    onSubmitPasswordReset: actions.onSubmitPasswordReset
+    onToggleAuthMode: actions.onToggleAuthMode
   }), [
     state.user,
     state.me,
@@ -55,26 +44,15 @@ export default function App() {
     state.authMode,
     state.email,
     state.password,
-    state.resetConfirmPassword,
-    state.resetTokenStatus,
-    state.passwordResetOutbox,
-    state.passwordResetTestValue,
-    state.showResetTestHarness,
     state.displayName,
     actions.setAuthMode,
     actions.setEmail,
     actions.setPassword,
-    actions.setResetConfirmPassword,
     actions.setDisplayName,
     actions.onSubmitAuth,
     actions.onGoogleLogin,
     actions.onLogout,
-    actions.onToggleAuthMode,
-    actions.onStartPasswordReset,
-    actions.onReturnToLogin,
-    actions.onRequestPasswordReset,
-    actions.onOpenPasswordResetLink,
-    actions.onSubmitPasswordReset
+    actions.onToggleAuthMode
   ]);
 
   const alertContextValue = useMemo(() => ({
@@ -117,7 +95,7 @@ export default function App() {
           <Header />
           <Alerts error={state.error} success={state.success} />
 
-          {!state.isAuthenticated || state.isResetAuthMode ? (
+          {!state.isAuthenticated ? (
             <AuthView />
           ) : state.activeView === "dashboard" ? (
           <DashboardView
@@ -142,7 +120,6 @@ export default function App() {
             onAcceptPendingInvite={actions.onAcceptPendingInvite}
             onDeleteInvite={actions.onDeleteInvite}
             onRefreshPendingInvites={actions.onRefreshPendingInvites}
-            onStartPasswordReset={actions.onStartPasswordReset}
             setSelectedGroupId={actions.setSelectedGroupId}
             setNewGroupName={actions.setNewGroupName}
             setInviteEmail={actions.setInviteEmail}

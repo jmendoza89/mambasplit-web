@@ -213,7 +213,7 @@ describe("DashboardView", () => {
     expect(deleteButton).toHaveAttribute("title", "Invite identifier is unavailable for this row.");
   });
 
-  it("shows owner crown only for owned groups", () => {
+  it("shows owner and member chips in groups list", () => {
     renderView(
       {
         groups: [
@@ -226,21 +226,8 @@ describe("DashboardView", () => {
       }
     );
 
-    expect(screen.getAllByLabelText("Group owner")).toHaveLength(1);
-  });
-
-  it("renders group balance summaries with owe/get-back messaging", () => {
-    renderView(
-      {
-        groups: [
-          { id: "group-1", name: "Trip", netBalanceCents: -300 },
-          { id: "group-2", name: "Dinner", netBalanceCents: 450 }
-        ]
-      }
-    );
-
-    expect(screen.getByText("you owe $3.00")).toBeInTheDocument();
-    expect(screen.getByText("you get back $4.50")).toBeInTheDocument();
+    expect(screen.getByText("Owner")).toBeInTheDocument();
+    expect(screen.getByText("Member")).toBeInTheDocument();
   });
 
   it("treats role and ownership flags from api payload as owner", () => {
@@ -256,6 +243,6 @@ describe("DashboardView", () => {
       }
     );
 
-    expect(screen.getAllByLabelText("Group owner")).toHaveLength(2);
+    expect(screen.getAllByText("Owner")).toHaveLength(2);
   });
 });
