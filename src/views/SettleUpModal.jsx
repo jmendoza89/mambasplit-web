@@ -48,6 +48,33 @@ function computePairBalanceCents(expenses, fromUserId, toUserId) {
   return Math.max(0, netCents);
 }
 
+function pickBestReceiverId(currentUserId, members, expenses, suggestions) {
+  if (!currentUserId) return "";
+  const receiverCandidates = (members || []).filter((member) => member?.id && member.id !== currentUserId);
+  if (!receiverCandidates.length) return "";
+
+  let bestReceiverId = "";
+  let bestAmount = 0;
+  for (const candidate of receiverCandidates) {
+    const amountCents = computePairBalanceCents(expenses, currentUserId, candidate.id);
+    if (amountCents > bestAmount) {
+      bestAmount = amountCents;
+      bestReceiverId = candidate.id;
+    }
+  }
+
+  if (bestReceiverId) return bestReceiverId;
+
+  const suggestionReceiverId = (suggestions || []).find(
+    (suggestion) => suggestion?.fromUserId === currentUserId && suggestion?.toUserId && suggestion.toUserId !== currentUserId
+  )?.toUserId;
+  if (suggestionReceiverId && receiverCandidates.some((member) => member.id === suggestionReceiverId)) {
+    return suggestionReceiverId;
+  }
+
+  return receiverCandidates[0]?.id || "";
+}
+
 export default function SettleUpModal({
   isOpen,
   onClose,
@@ -97,13 +124,13 @@ export default function SettleUpModal({
     return map;
   }, [safeSuggestions]);
   const expectedPairAmountCents = useMemo(() => {
-    const fromToSuggestion = suggestionAmountByPair.get(pairKey(fromUserId, toUserId));
-    if (typeof fromToSuggestion === "number" && fromToSuggestion > 0) {
-      return fromToSuggestion;
-    }
     const computedFromExpenses = computePairBalanceCents(safeExpenses, fromUserId, toUserId);
     if (computedFromExpenses > 0) {
       return computedFromExpenses;
+    }
+    const fromToSuggestion = suggestionAmountByPair.get(pairKey(fromUserId, toUserId));
+    if (typeof fromToSuggestion === "number" && fromToSuggestion > 0) {
+      return fromToSuggestion;
     }
     return Math.max(0, autoSelectedExpenseTotalCents);
   }, [suggestionAmountByPair, fromUserId, toUserId, safeExpenses, autoSelectedExpenseTotalCents]);
@@ -122,16 +149,24 @@ export default function SettleUpModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const currentUserSuggestion = safeSuggestions.find(
-      (suggestion) => suggestion?.fromUserId === currentUserId
-    );
-    const fallbackCounterparty = safeMembers.find((member) => member.id !== currentUserId);
+    const resolvedToUserId = pickBestReceiverId(currentUserId, safeMembers, safeExpenses, safeSuggestions);
+    const computedFromExpenses = computePairBalanceCents(safeExpenses, currentUserId, resolvedToUserId);
+    const suggestedAmount = suggestionAmountByPair.get(pairKey(currentUserId, resolvedToUserId)) || 0;
+    const resolvedAmountCents = computedFromExpenses > 0
+      ? computedFromExpenses
+      : Math.max(0, suggestedAmount || autoSelectedExpenseTotalCents);
     setFromUserId(currentUserId || "");
-    setToUserId(currentUserSuggestion?.toUserId || fallbackCounterparty?.id || "");
-    setCashAmount(
-      (Math.max(0, currentUserSuggestion?.amountCents || autoSelectedExpenseTotalCents) / 100).toFixed(2)
-    );
-  }, [isOpen, safeMembers, safeSuggestions, currentUserId, autoSelectedExpenseTotalCents]);
+    setToUserId(resolvedToUserId);
+    setCashAmount((resolvedAmountCents / 100).toFixed(2));
+  }, [
+    isOpen,
+    safeMembers,
+    safeSuggestions,
+    safeExpenses,
+    currentUserId,
+    autoSelectedExpenseTotalCents,
+    suggestionAmountByPair
+  ]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -277,7 +312,7 @@ export default function SettleUpModal({
                     onChange={(event) => setToUserId(event.target.value)}
                   >
                     <option value="">Select receiver</option>
-                    {safeMembers.map((member) => (
+                    {safeMembers.filter((member) => member.id !== (currentUserId || "")).map((member) => (
                       <option key={member.id} value={member.id}>{member.name}</option>
                     ))}
                   </select>
