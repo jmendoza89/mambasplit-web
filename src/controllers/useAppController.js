@@ -1,6 +1,12 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getStoredUser } from "../api";
 import { fetchSessionData } from "../services";
+import {
+  consumeMockPasswordResetToken,
+  createMockPasswordResetRequest,
+  getLatestMockPasswordResetResult,
+  verifyMockPasswordResetToken
+} from "../services/mockPasswordResetService";
 import { useAuthController } from "./useAuthController";
 import { useDashboardController } from "./useDashboardController";
 import { useGroupController } from "./useGroupController";
@@ -25,10 +31,20 @@ export function useAppController() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [resetTokenStatus, setResetTokenStatus] = useState("idle");
+  const [passwordResetOutbox, setPasswordResetOutbox] = useState(null);
+  const [passwordResetTestValue, setPasswordResetTestValue] = useState("");
 
   const currentName = useMemo(() => (me && me.displayName) || (user && user.displayName) || "User", [me, user]);
   const currentEmail = useMemo(() => (me && me.email) || (user && user.email) || "-", [me, user]);
   const currentId = useMemo(() => (me && me.id) || (user && user.id) || "-", [me, user]);
+  const showResetTestHarness = useMemo(
+    () => import.meta.env.MODE !== "production" || import.meta.env.VITE_ENABLE_RESET_TEST_HARNESS === "true",
+    []
+  );
+  const isResetAuthMode = authMode === "resetRequest" || authMode === "resetPassword";
 
   const loadSessionData = useCallback(async () => {
     const { me: meData, groups: groupData } = await fetchSessionData();
@@ -98,9 +114,139 @@ export function useAppController() {
     onResetGroupState: groupController.actions.onResetGroupState
   });
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get("resetToken") || "";
+    if (!tokenFromUrl) return;
+
+    const verification = verifyMockPasswordResetToken(tokenFromUrl);
+    setResetToken(tokenFromUrl);
+    setResetTokenStatus(verification.status);
+    if (verification.email) {
+      setEmail(verification.email);
+    }
+    setAuthMode("resetPassword");
+  }, []);
+
+  const onStartPasswordReset = useCallback((prefillEmail = "") => {
+    setError("");
+    setSuccess("");
+    setPassword("");
+    setResetConfirmPassword("");
+    setResetToken("");
+    setResetTokenStatus("idle");
+    if (prefillEmail) {
+      setEmail(prefillEmail);
+    }
+    setAuthMode("resetRequest");
+  }, [setAuthMode]);
+
+  const onReturnToLogin = useCallback(() => {
+    setError("");
+    setSuccess("");
+    setPassword("");
+    setResetConfirmPassword("");
+    setResetToken("");
+    setResetTokenStatus("idle");
+    setAuthMode("login");
+    const nextQuery = new URLSearchParams(window.location.search);
+    nextQuery.delete("resetToken");
+    const queryString = nextQuery.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${queryString ? `?${queryString}` : ""}`);
+  }, [setAuthMode]);
+
+  const onRequestPasswordReset = useCallback(async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setBusy(true);
+
+    try {
+      const request = createMockPasswordResetRequest(email);
+      setPasswordResetOutbox(request);
+      setPasswordResetTestValue("");
+      setSuccess("If an account exists, a password reset link has been sent.");
+    } catch {
+      setError("Unable to generate a reset link in test mode.");
+    } finally {
+      setBusy(false);
+    }
+  }, [email]);
+
+  const onOpenPasswordResetLink = useCallback((link) => {
+    setError("");
+    setSuccess("");
+
+    const parsed = new URL(link, window.location.origin);
+    const nextToken = parsed.searchParams.get("resetToken") || "";
+    if (!nextToken) {
+      setResetToken("");
+      setResetTokenStatus("invalid");
+      setAuthMode("resetPassword");
+      setError("Reset link is invalid.");
+      return;
+    }
+
+    const verification = verifyMockPasswordResetToken(nextToken);
+    setResetToken(nextToken);
+    setResetTokenStatus(verification.status);
+    if (verification.email) {
+      setEmail(verification.email);
+    }
+    setAuthMode("resetPassword");
+    window.history.pushState({}, "", `/?resetToken=${encodeURIComponent(nextToken)}`);
+
+    if (verification.status === "valid") {
+      setSuccess("Reset link verified. Set a new password.");
+    } else {
+      setError("Reset link is invalid, expired, or already used.");
+    }
+  }, [setAuthMode]);
+
+  const onSubmitPasswordReset = useCallback(async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!resetToken) {
+      setResetTokenStatus("invalid");
+      setError("Reset link is missing.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (password !== resetConfirmPassword) {
+      setError("Password confirmation does not match.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = consumeMockPasswordResetToken(resetToken, password);
+      setResetTokenStatus(result.status === "reset" ? "used" : result.status);
+      if (result.status !== "reset") {
+        setError("Reset link is invalid, expired, or already used.");
+        return;
+      }
+
+      const latest = getLatestMockPasswordResetResult();
+      setPasswordResetTestValue(latest?.password || "");
+      setPassword("");
+      setResetConfirmPassword("");
+      setSuccess("Password reset complete in test mode.");
+    } finally {
+      setBusy(false);
+    }
+  }, [password, resetConfirmPassword, resetToken]);
+
   return {
     state: {
       authMode,
+      isResetAuthMode,
       loading,
       error,
       success,
@@ -147,7 +293,12 @@ export function useAppController() {
       groupOwnershipById: dashboardController.state.groupOwnershipById,
       displayName,
       email,
-      password
+      password,
+      resetConfirmPassword,
+      resetTokenStatus,
+      passwordResetOutbox,
+      passwordResetTestValue,
+      showResetTestHarness
     },
     refs: {
       expenseDescriptionRef: groupController.refs.expenseDescriptionRef,
@@ -165,10 +316,16 @@ export function useAppController() {
       setDisplayName,
       setEmail,
       setPassword,
+      setResetConfirmPassword,
       onToggleAuthMode: authController.onToggleAuthMode,
       onSubmitAuth: authController.onSubmitAuth,
       onGoogleLogin: authController.onGoogleLogin,
       onLogout: authController.onLogout,
+      onStartPasswordReset,
+      onReturnToLogin,
+      onRequestPasswordReset,
+      onOpenPasswordResetLink,
+      onSubmitPasswordReset,
       onCreateGroup: dashboardController.actions.onCreateGroup,
       onCreateInvite: dashboardController.actions.onCreateInvite,
       onAcceptPendingInvite: dashboardController.actions.onAcceptPendingInvite,
