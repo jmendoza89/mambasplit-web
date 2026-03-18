@@ -8,7 +8,6 @@ export default function DashboardHero({
   pendingInvitesLoading,
   onOpenGroupPage,
   onRefreshPendingInvites,
-  onStartPasswordReset = () => {},
   onLogout
 }) {
   return (
@@ -38,14 +37,6 @@ export default function DashboardHero({
               disabled={busy || pendingInvitesLoading}
             >
               Refresh
-            </button>
-            <button
-              className="btn-inline"
-              type="button"
-              onClick={() => onStartPasswordReset(currentEmail)}
-              disabled={busy}
-            >
-              Reset Password
             </button>
             <button className="btn-ghost" type="button" onClick={onLogout} disabled={busy}>
               Logout

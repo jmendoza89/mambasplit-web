@@ -4,7 +4,11 @@ import { isGroupOwner as checkGroupOwnership } from "../utils/groupOwnership";
 import DashboardEmptyState from "./components/DashboardEmptyState";
 import DashboardGroupCardItem from "./components/DashboardGroupCardItem";
 import DashboardHero from "./components/DashboardHero";
+import DashboardEmptyState from "./components/DashboardEmptyState";
+import DashboardGroupCardItem from "./components/DashboardGroupCardItem";
+import DashboardHero from "./components/DashboardHero";
 import DashboardInviteCard from "./components/DashboardInviteCard";
+import DashboardSentInviteCard from "./components/DashboardSentInviteCard";
 import DashboardSentInviteCard from "./components/DashboardSentInviteCard";
 
 export default function DashboardView({
@@ -67,7 +71,6 @@ export default function DashboardView({
           pendingInvitesLoading={pendingInvitesLoading}
           onOpenGroupPage={onOpenGroupPage}
           onRefreshPendingInvites={onRefreshPendingInvites}
-          onStartPasswordReset={onStartPasswordReset}
           onLogout={onLogout}
         />
 
