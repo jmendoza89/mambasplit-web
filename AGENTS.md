@@ -2,19 +2,10 @@
 
 ## Scope
 - This file applies to all repositories under `C:\MambaSplit`.
-- Repository-level `AGENTS.md` files may add stricter or more specific rules.
-- When rules conflict, the closest `AGENTS.md` to the target repo wins.
-
-## Multi-Repo Lockstep Policy
-- This policy is governed in lockstep across three files:
-  - C:\MambaSplit\MambaSplit.Api\AGENTS.md
-  - C:\MambaSplit\agent-templates\AGENTS.md
-  - C:\MambaSplit\mambasplit-web\AGENTS.md
-- Any policy-level AGENTS change must be applied consistently to all three files unless explicitly scoped otherwise.
-- If a conflict exists between the three files, stop and report:
-  1. conflicting section
-  2. proposed canonical wording
-  3. files requiring reconciliation
+- `C:\MambaSplit\agent-templates\AGENTS.md` is the shared base policy.
+- Consuming repositories should sync this file into their repo root as `AGENTS.md`.
+- Repository-specific policy belongs in `AGENTS.repo.md`, which is appended to the synced base by `./scripts/sync-agents.ps1`.
+- When a repository has an `AGENTS.repo.md`, its contents override or refine the shared base for that repository only.
 
 ## Workflow Ownership Model
 - AGENTS.md defines policy requirements and invariants.
@@ -97,6 +88,14 @@ Branch protection requirements for `main` should also include:
   - risk-first-pr-reviewer
 - Frontend visual implementation agent:
   - ui-visual-implementer
+- Frontend engineering agent:
+  - expert-react-frontend-engineer
+- General autonomous coding agent:
+  - 4.1 Beast Mode v3.1
+- C#/.NET maintenance agent:
+  - csharp-dotnet-janitor
+- Email template design agent:
+  - email-template-designer
 - When these agents are available, prefer them over ad-hoc execution for their scope.
 - Agents must respect all safety, issue-linking, branch strategy, and failure behavior rules defined in this file.
 
@@ -104,7 +103,7 @@ Branch protection requirements for `main` should also include:
 - Prefer project-provided scripts if present.
 - For Java projects, prefer wrapper commands (`mvnw`, `gradlew`) over global installs.
 - For local infra, verify Docker daemon before running compose commands.
-- Before committing in consuming repositories, run `./scripts/sync-agents.ps1` to sync `.github/agents` from `agent-templates/agents`.
+- Before committing in consuming repositories, run `./scripts/sync-agents.ps1` to sync `.github/agents` from `agent-templates/agents` and rebuild `AGENTS.md` from the shared base plus any local `AGENTS.repo.md` overrides.
 
 ## Safety Rules
 - Never run destructive git commands unless explicitly requested.
@@ -199,4 +198,46 @@ Why the correct approach works:
 - `Select-Object -First N` safely reads the first N lines.
 - `Select-Object -Skip N -First M` safely reads specific line ranges.
 - No directory navigation is needed; direct file access is simpler and more reliable.
+
+## Repository-Specific Overrides
+## Agent Cheat Sheet
+
+Use natural language by default. Name the agent explicitly only when you want to force a specific workflow.
+
+### Default Rule
+- If the request is general and unambiguous, Codex can usually pick the right approach without you naming an agent.
+- If you want a specific runbook, say `Use <agent-name> ...` in your prompt.
+
+### Best-Fit Agents For This Repo
+- `feature-workflow-manager`
+  - Use for branch and PR workflow tasks.
+  - Example prompts:
+    - `Use feature-workflow-manager to start issue 123`
+    - `Use feature-workflow-manager to commit and sync my changes`
+    - `Use feature-workflow-manager to finalize this branch`
+- `risk-first-pr-reviewer`
+  - Use for findings-first code review, regression checks, and merge risk analysis.
+  - Example prompts:
+    - `Use risk-first-pr-reviewer to review these changes`
+    - `Use risk-first-pr-reviewer to look for regressions`
+- `ui-visual-implementer`
+  - Use for styling polish, layout refinement, responsive visual improvements, and motion.
+  - Example prompts:
+    - `Use ui-visual-implementer to polish the dashboard`
+    - `Use ui-visual-implementer to improve the mobile layout`
+- `expert-react-frontend-engineer`
+  - Use for React implementation, refactors, hooks, component architecture, performance, and frontend tests.
+  - Example prompts:
+    - `Use expert-react-frontend-engineer to refactor this React component`
+    - `Use expert-react-frontend-engineer to add tests for this page`
+- `4.1 Beast Mode v3.1`
+  - Use for broad end-to-end coding tasks when no narrower agent is a better fit.
+  - Example prompts:
+    - `Use 4.1 Beast Mode v3.1 to handle this task end to end`
+
+### Usually Not Relevant Here
+- `csharp-dotnet-janitor`
+  - Prefer this in `MambaSplit.Api` for .NET cleanup and modernization work.
+- `email-template-designer`
+  - Prefer this in `MambaSplit.Api` for transactional email template work.
 
