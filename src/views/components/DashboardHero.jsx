@@ -54,9 +54,6 @@ export default function DashboardHero({
             >
               Refresh
             </button>
-            <button className="btn-ghost" type="button" onClick={onLogout} disabled={busy}>
-              Logout
-            </button>
             <div className="account-menu" ref={menuRef}>
               <button
                 className="account-menu-trigger"
@@ -85,6 +82,18 @@ export default function DashboardHero({
                     }}
                   >
                     Your Account
+                  </button>
+                  <button
+                    type="button"
+                    className="account-menu-item account-menu-item-danger"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onLogout();
+                    }}
+                    disabled={busy}
+                  >
+                    Logout
                   </button>
                 </div>
               ) : null}

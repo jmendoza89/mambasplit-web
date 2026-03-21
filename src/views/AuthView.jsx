@@ -21,7 +21,8 @@ export default function AuthView() {
     passwordResetTestValue,
     showResetTestHarness,
     onSubmitAuth,
-    onGoogleLogin,
+    googleButtonRef,
+    googleButtonStatus,
     onToggleAuthMode,
     onStartPasswordReset,
     onReturnToLogin,
@@ -106,10 +107,14 @@ export default function AuthView() {
             </form>
 
             <div className="actions">
-              <button type="button" className="btn-secondary" onClick={onGoogleLogin} disabled={busy}>
-                {isLogin ? "Sign in with Google" : "Sign up with Google"}
-              </button>
+              <div ref={googleButtonRef} aria-label={isLogin ? "Sign in with Google" : "Sign up with Google"} />
             </div>
+            {googleButtonStatus === "loading" ? (
+              <p className="auth-hint">Loading Google Sign-In...</p>
+            ) : null}
+            {googleButtonStatus === "error" || googleButtonStatus === "unconfigured" ? (
+              <p className="auth-hint">Google Sign-In is unavailable right now.</p>
+            ) : null}
             <p className="auth-hint">Use Google to sign in, or create an account automatically if you are new.</p>
             <p className="auth-hint">
               <a

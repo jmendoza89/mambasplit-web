@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatDate, formatMoney, initials } from "../utils/formatters";
+import { resolveGroupBalanceCents } from "../utils/groupBalance";
 import ExpenseCardItem from "./components/ExpenseCardItem";
 import GroupDetailsHero from "./components/GroupDetailsHero";
 import MemberCardItem from "./components/MemberCardItem";
@@ -212,7 +213,7 @@ export default function GroupView({
           totalExpense={totalExpense}
           settlementCount={settlementCount}
           totalSettlementAmount={totalSettlementAmount}
-          netBalanceCents={detailsMe?.netBalanceCents || 0}
+          netBalanceCents={resolveGroupBalanceCents(displayedGroup, detailsMe)}
           role={effectiveMyRole}
           isGroupOwner={isGroupOwner}
         />

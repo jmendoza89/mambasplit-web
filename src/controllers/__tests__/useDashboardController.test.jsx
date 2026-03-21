@@ -72,13 +72,13 @@ describe("useDashboardController", () => {
     expect(setSuccess).toHaveBeenCalledWith("Group created.");
   });
 
-  it("loads pending invites for current email with sentToEmail fallback", async () => {
+  it("loads pending invites for current email", async () => {
     groupService.listPendingInvitesByEmail.mockResolvedValueOnce([
       {
         id: "invite-1",
         groupId: "group-1",
         groupName: "Trip",
-        email: "u@example.com",
+        sentToEmail: "u@example.com",
         expiresAt: "2026-03-01T00:00:00Z",
         createdAt: "2026-02-25T00:00:00Z"
       }
@@ -107,7 +107,105 @@ describe("useDashboardController", () => {
     expect(groupService.listPendingInvitesByEmail).toHaveBeenCalledWith("u@example.com");
     expect(result.current.state.pendingInvites).toHaveLength(1);
     expect(result.current.state.pendingInvites[0].sentToEmail).toBe("u@example.com");
+    expect(result.current.state.pendingInvites[0].senderName).toBe("");
+    expect(result.current.state.pendingInvites[0].senderEmail).toBe("");
     expect(result.current.state.pendingInvitesError).toBe("");
+  });
+
+  it("maps pending invite sender details from inviter fields when available", async () => {
+    groupService.listPendingInvitesByEmail.mockResolvedValueOnce([
+      {
+        id: "invite-1",
+        groupId: "group-1",
+        groupName: "Trip",
+        sentToEmail: "u@example.com",
+        inviterName: "Julio",
+        inviterEmail: "julio@mambatech.io",
+        expiresAt: "2026-03-01T00:00:00Z",
+        createdAt: "2026-02-25T00:00:00Z"
+      }
+    ]);
+
+    const { result } = renderHook(() =>
+      useDashboardController({
+        groups: [],
+        selectedGroupId: "",
+        setGroups: vi.fn(),
+        setSelectedGroupId: vi.fn(),
+        setError: vi.fn(),
+        setSuccess: vi.fn(),
+        setBusy: vi.fn(),
+        currentId: "user-1",
+        currentEmail: "u@example.com",
+        loadSessionData: vi.fn(async () => {}),
+        onOpenGroupPage: vi.fn()
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.pendingInvitesLoading).toBe(false);
+    });
+
+    expect(result.current.state.pendingInvites[0].senderName).toBe("Julio");
+    expect(result.current.state.pendingInvites[0].senderEmail).toBe("julio@mambatech.io");
+  });
+
+  it("hydrates invite cards from the /me payload when explicit sender and recipient fields are present", async () => {
+    const me = {
+      receivedInvites: [{
+        id: "pending-1",
+        groupId: "group-1",
+        groupName: "Trip",
+        sentByUserId: "user-2",
+        sentByDisplayName: "Julio",
+        sentByEmail: "julio@mambatech.io",
+        sentToEmail: "u@example.com",
+        expiresAt: "2026-03-01T00:00:00Z",
+        createdAt: "2026-02-25T00:00:00Z"
+      }],
+      sentInvites: [{
+        id: "sent-1",
+        groupId: "group-1",
+        groupName: "Trip",
+        sentByUserId: "user-1",
+        sentByDisplayName: "Owner",
+        sentByEmail: "owner@example.com",
+        sentToEmail: "friend@example.com",
+        expiresAt: "2026-03-02T00:00:00Z",
+        createdAt: "2026-02-26T00:00:00Z"
+      }]
+    };
+
+    const { result } = renderHook(() =>
+      useDashboardController({
+        groups: [{ id: "group-1", name: "Trip" }],
+        selectedGroupId: "group-1",
+        setGroups: vi.fn(),
+        setSelectedGroupId: vi.fn(),
+        setError: vi.fn(),
+        setSuccess: vi.fn(),
+        setBusy: vi.fn(),
+        currentId: "user-1",
+        currentEmail: "u@example.com",
+        me,
+        loadSessionData: vi.fn(async () => {}),
+        onOpenGroupPage: vi.fn()
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.pendingInvitesLoading).toBe(false);
+      expect(result.current.state.sentInvites).toHaveLength(1);
+    });
+
+    expect(groupService.listPendingInvitesByEmail).not.toHaveBeenCalled();
+    expect(groupService.listGroupInvites).not.toHaveBeenCalled();
+    expect(result.current.state.pendingInvites[0].senderName).toBe("Julio");
+    expect(result.current.state.pendingInvites[0].senderEmail).toBe("julio@mambatech.io");
+    expect(result.current.state.pendingInvites[0].sentToEmail).toBe("u@example.com");
+    expect(result.current.state.sentInvites[0].sentByDisplayName).toBe("Owner");
+    expect(result.current.state.sentInvites[0].sentByEmail).toBe("owner@example.com");
+    expect(result.current.state.sentInvites[0].sentToEmail).toBe("friend@example.com");
   });
 
   it("handles empty pending invite response", async () => {
@@ -165,35 +263,45 @@ describe("useDashboardController", () => {
   });
 
   it("maps sent invites with sentByUserId and sentToEmail, filtering other senders", async () => {
-    groupService.listGroupInvites.mockResolvedValueOnce([
-      {
-        id: "mine-1",
-        groupId: "group-1",
-        sentToEmail: "friend1@example.com",
-        sentByUserId: "user-1",
-        createdAt: "2026-03-05T00:00:00Z",
-        expiresAt: "2026-03-12T00:00:00Z"
-      },
-      {
-        id: "theirs-1",
-        groupId: "group-1",
-        sentToEmail: "friend2@example.com",
-        sentByUserId: "user-2",
-        createdAt: "2026-03-06T00:00:00Z",
-        expiresAt: "2026-03-13T00:00:00Z"
-      },
-      {
-        id: "legacy-1",
-        groupId: "group-1",
-        email: "legacy@example.com",
-        createdAt: "2026-03-04T00:00:00Z",
-        expiresAt: "2026-03-11T00:00:00Z"
+    groupService.listGroupInvites.mockImplementation(async (groupId) => {
+      if (groupId === "group-1") {
+        return [
+          {
+            id: "mine-1",
+            groupId: "group-1",
+            sentToEmail: "friend1@example.com",
+            sentByUserId: "user-1",
+            createdAt: "2026-03-05T00:00:00Z",
+            expiresAt: "2026-03-12T00:00:00Z"
+          },
+          {
+            id: "theirs-1",
+            groupId: "group-1",
+            sentToEmail: "friend2@example.com",
+            sentByUserId: "user-2",
+            createdAt: "2026-03-06T00:00:00Z",
+            expiresAt: "2026-03-13T00:00:00Z"
+          }
+        ];
       }
-    ]);
+
+      return [
+        {
+          id: "legacy-1",
+          groupId: "group-2",
+          sentToEmail: "legacy@example.com",
+          createdAt: "2026-03-04T00:00:00Z",
+          expiresAt: "2026-03-11T00:00:00Z"
+        }
+      ];
+    });
 
     const { result } = renderHook(() =>
       useDashboardController({
-        groups: [{ id: "group-1", name: "Trip" }],
+        groups: [
+          { id: "group-1", name: "Trip" },
+          { id: "group-2", name: "Dinner" }
+        ],
         selectedGroupId: "group-1",
         setGroups: vi.fn(),
         setSelectedGroupId: vi.fn(),
@@ -216,6 +324,42 @@ describe("useDashboardController", () => {
       "legacy@example.com"
     ]);
     expect(result.current.state.sentInvites.every((invite) => invite.sentByUserId !== "user-2")).toBe(true);
+    expect(groupService.listGroupInvites).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses the loaded group name when sent invite payload omits groupName", async () => {
+    groupService.listGroupInvites.mockResolvedValueOnce([
+      {
+        id: "mine-1",
+        groupId: "group-1",
+        sentToEmail: "friend1@example.com",
+        sentByUserId: "user-1",
+        createdAt: "2026-03-05T00:00:00Z",
+        expiresAt: "2026-03-12T00:00:00Z"
+      }
+    ]);
+
+    const { result } = renderHook(() =>
+      useDashboardController({
+        groups: [{ id: "group-1", name: "Trip" }],
+        selectedGroupId: "group-1",
+        setGroups: vi.fn(),
+        setSelectedGroupId: vi.fn(),
+        setError: vi.fn(),
+        setSuccess: vi.fn(),
+        setBusy: vi.fn(),
+        currentId: "user-1",
+        currentEmail: "u@example.com",
+        loadSessionData: vi.fn(async () => {}),
+        onOpenGroupPage: vi.fn()
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.sentInvites).toHaveLength(1);
+    });
+
+    expect(result.current.state.sentInvites[0].groupName).toBe("Trip");
   });
 
   it("creates invite and updates sender-scoped list without reloading invites", async () => {
@@ -262,9 +406,59 @@ describe("useDashboardController", () => {
     expect(groupService.listGroupInvites).toHaveBeenCalledTimes(1);
     expect(result.current.state.sentInvites).toHaveLength(1);
     expect(result.current.state.sentInvites[0].sentToEmail).toBe("friend1@example.com");
-    expect(result.current.state.sentInvites[0].email).toBe("friend1@example.com");
     expect(result.current.state.sentInvites[0].sentByUserId).toBe("user-1");
     expect(setSuccess).toHaveBeenCalledWith("Invite created.");
+  });
+
+  it("refreshes an invite by deleting and resending it", async () => {
+    groupService.listGroupInvites.mockResolvedValueOnce([
+      {
+        id: "00000000-0000-4000-8000-000000000123",
+        groupId: "group-1",
+        groupName: "Trip",
+        sentToEmail: "friend@example.com",
+        sentByUserId: "user-1",
+        createdAt: "2026-03-01T00:00:00Z",
+        expiresAt: "2026-03-08T00:00:00Z"
+      }
+    ]);
+    groupService.createInvite.mockResolvedValueOnce({
+      id: "invite-refreshed-1",
+      token: "token-refreshed-1",
+      expiresAt: "2026-03-20T00:00:00Z"
+    });
+    const setSuccess = vi.fn();
+
+    const { result } = renderHook(() =>
+      useDashboardController({
+        groups: [{ id: "group-1", name: "Trip" }],
+        selectedGroupId: "group-1",
+        setGroups: vi.fn(),
+        setSelectedGroupId: vi.fn(),
+        setError: vi.fn(),
+        setSuccess,
+        setBusy: vi.fn(),
+        currentId: "user-1",
+        currentEmail: "u@example.com",
+        loadSessionData: vi.fn(async () => {}),
+        onOpenGroupPage: vi.fn()
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.sentInvites).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.actions.onRefreshInvite(result.current.state.sentInvites[0]);
+    });
+
+    expect(groupService.cancelInviteById).toHaveBeenCalledWith("group-1", "00000000-0000-4000-8000-000000000123");
+    expect(groupService.createInvite).toHaveBeenCalledWith("group-1", "friend@example.com");
+    expect(result.current.state.sentInvites).toHaveLength(1);
+    expect(result.current.state.sentInvites[0].sentToEmail).toBe("friend@example.com");
+    expect(result.current.state.sentInvites[0].id).toBe("invite-refreshed-1");
+    expect(setSuccess).toHaveBeenCalledWith("Invite refreshed.");
   });
 
   it("deletes an invite when token is available and does not force refetch", async () => {

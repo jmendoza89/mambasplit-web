@@ -146,7 +146,9 @@ export const authApi = {
 };
 
 export const meApi = {
-  fetchMe: () => api("/api/v1/me")
+  fetchMe: () => api("/api/v1/me"),
+  changePassword: (currentPassword, newPassword) =>
+    api("/api/v1/me/password", "POST", { currentPassword, newPassword })
 };
 
 export const groupsApi = {

@@ -1,30 +1,58 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { initials } from "../utils/formatters";
+
+const EDITABLE_FIELDS = ["displayName", "email", "phone", "avatar"];
+
+function createProfileState({ currentName, currentEmail, currentPhone, currentAvatarUrl }) {
+  return {
+    displayName: currentName || "",
+    email: currentEmail === "-" ? "" : currentEmail || "",
+    phone: currentPhone || "",
+    avatarUrl: currentAvatarUrl || ""
+  };
+}
+
+function emptyPasswordForm() {
+  return {
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  };
+}
 
 export default function AccountView({
   currentName,
   currentEmail,
   currentPhone,
   currentAvatarUrl,
+  hasGoogleLogin,
   busy,
   onBackToDashboard,
-  onSaveAccountProfile
+  onSaveAccountProfile,
+  onChangePassword
 }) {
-  const [form, setForm] = useState({
-    displayName: currentName || "",
-    email: currentEmail === "-" ? "" : currentEmail || "",
-    phone: currentPhone || "",
-    avatarUrl: currentAvatarUrl || ""
-  });
+  const baseProfile = useMemo(
+    () => createProfileState({ currentName, currentEmail, currentPhone, currentAvatarUrl }),
+    [currentName, currentEmail, currentPhone, currentAvatarUrl]
+  );
+  const [form, setForm] = useState(baseProfile);
+  const [editingField, setEditingField] = useState("");
+  const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState(emptyPasswordForm);
 
   useEffect(() => {
-    setForm({
-      displayName: currentName || "",
-      email: currentEmail === "-" ? "" : currentEmail || "",
-      phone: currentPhone || "",
-      avatarUrl: currentAvatarUrl || ""
-    });
-  }, [currentName, currentEmail, currentPhone, currentAvatarUrl]);
+    setForm(baseProfile);
+    setEditingField("");
+    setIsEditingPassword(false);
+    setPasswordForm(emptyPasswordForm());
+  }, [baseProfile]);
+
+  const hasChanges = useMemo(() => (
+    form.displayName !== baseProfile.displayName
+    || form.email !== baseProfile.email
+    || form.phone !== baseProfile.phone
+    || form.avatarUrl !== baseProfile.avatarUrl
+  ), [form, baseProfile]);
 
   function handleFieldChange(event) {
     const { name, value } = event.target;
@@ -37,26 +65,111 @@ export default function AccountView({
 
     const reader = new FileReader();
     reader.onload = () => {
-      setForm((prev) => ({ ...prev, avatarUrl: typeof reader.result === "string" ? reader.result : prev.avatarUrl }));
+      setForm((prev) => ({
+        ...prev,
+        avatarUrl: typeof reader.result === "string" ? reader.result : prev.avatarUrl
+      }));
     };
     reader.readAsDataURL(file);
+  }
+
+  function startEditing(fieldName) {
+    if (!EDITABLE_FIELDS.includes(fieldName)) return;
+    setEditingField(fieldName);
+  }
+
+  function cancelEditing() {
+    setForm(baseProfile);
+    setEditingField("");
   }
 
   function handleSubmit(event) {
     event.preventDefault();
     onSaveAccountProfile(form);
+    setEditingField("");
   }
+
+  function handlePasswordFieldChange(event) {
+    const { name, value } = event.target;
+    setPasswordForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function startPasswordEditing() {
+    setIsEditingPassword(true);
+    setPasswordForm(emptyPasswordForm());
+  }
+
+  function cancelPasswordEditing() {
+    setIsEditingPassword(false);
+    setPasswordForm(emptyPasswordForm());
+  }
+
+  async function handlePasswordSubmit(event) {
+    event.preventDefault();
+    if (passwordForm.newPassword.length < 8) {
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      return;
+    }
+
+    try {
+      await onChangePassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      });
+      cancelPasswordEditing();
+    } catch {
+      // Global alert state already shows the error.
+    }
+  }
+
+  function renderEditableRow({ field, label, value, type = "text", placeholder = "" }) {
+    const isEditing = editingField === field;
+
+    return (
+      <div className="account-info-row" key={field}>
+        <div className="account-info-head">
+          <label htmlFor={`account-${field}`}>{label}</label>
+          {!isEditing ? (
+            <button type="button" className="account-inline-edit" onClick={() => startEditing(field)}>
+              Edit
+            </button>
+          ) : null}
+        </div>
+
+        {isEditing ? (
+          <input
+            id={`account-${field}`}
+            name={field}
+            type={type}
+            value={value}
+            onChange={handleFieldChange}
+            placeholder={placeholder}
+            required={field !== "phone"}
+            autoFocus
+          />
+        ) : (
+          <p className="account-readonly-value">{value || "Not added yet"}</p>
+        )}
+      </div>
+    );
+  }
+
+  const isEditingAvatar = editingField === "avatar";
 
   return (
     <section className="dash-wrap">
       <article className="card panel account-page">
-        <div className="account-page-top">
-          <button className="btn-ghost" type="button" onClick={onBackToDashboard}>
-            Back to Dashboard
-          </button>
+        <div className="account-page-header">
+          <h2>Your account</h2>
+          <div className="account-page-top">
+            <button className="btn-ghost" type="button" onClick={onBackToDashboard}>
+              Back to Dashboard
+            </button>
+          </div>
         </div>
-
-        <h2>Your account</h2>
 
         <form className="account-layout" onSubmit={handleSubmit}>
           <section className="account-avatar-panel">
@@ -66,32 +179,147 @@ export default function AccountView({
               <div className="account-avatar-fallback" aria-hidden="true">{initials(form.displayName || currentName)}</div>
             )}
 
-            <label className="account-file-label" htmlFor="accountAvatar">
-              Change your avatar
-            </label>
-            <input id="accountAvatar" type="file" accept="image/*" onChange={handleAvatarChange} />
+            <div className="account-info-head">
+              <label className="account-file-label" htmlFor="accountAvatar">
+                Change your avatar
+              </label>
+              {!isEditingAvatar ? (
+                <button type="button" className="account-inline-edit" onClick={() => startEditing("avatar")}>
+                  Edit
+                </button>
+              ) : null}
+            </div>
+
+            {isEditingAvatar ? (
+              <input id="accountAvatar" type="file" accept="image/*" onChange={handleAvatarChange} />
+            ) : (
+              <p className="account-avatar-note">Click edit to choose a new profile photo.</p>
+            )}
           </section>
 
           <section className="account-fields">
-            <label htmlFor="accountDisplayName">Your name</label>
-            <input id="accountDisplayName" name="displayName" value={form.displayName} onChange={handleFieldChange} required />
+            {renderEditableRow({
+              field: "displayName",
+              label: "Your name",
+              value: form.displayName
+            })}
 
-            <label htmlFor="accountEmail">Your email address</label>
-            <input id="accountEmail" name="email" type="email" value={form.email} onChange={handleFieldChange} required />
+            {renderEditableRow({
+              field: "email",
+              label: "Your email address",
+              value: form.email,
+              type: "email"
+            })}
 
-            <label htmlFor="accountPhone">Your phone number</label>
-            <input id="accountPhone" name="phone" type="tel" value={form.phone} onChange={handleFieldChange} placeholder="Add a phone number" />
+            {renderEditableRow({
+              field: "phone",
+              label: "Your phone number",
+              value: form.phone,
+              type: "tel",
+              placeholder: "Add a phone number"
+            })}
 
-            <label htmlFor="accountPassword">Your password</label>
-            <input id="accountPassword" type="password" value="************" disabled readOnly />
-            <p className="account-password-note">Password updates are not available in this screen yet.</p>
-
-            <div className="actions">
-              <button type="submit" className="btn-primary" disabled={busy}>
-                Save Profile
-              </button>
-            </div>
+            {editingField ? (
+              <div className="actions">
+                <button type="submit" className="btn-primary" disabled={busy || !hasChanges}>
+                  Save Changes
+                </button>
+                <button type="button" className="btn-ghost" onClick={cancelEditing} disabled={busy}>
+                  Cancel
+                </button>
+              </div>
+            ) : null}
           </section>
+        </form>
+
+        <form className="account-password-panel" onSubmit={handlePasswordSubmit}>
+          <div className="account-info-row">
+            <div className="account-info-head">
+              <label htmlFor="account-new-password">Your password</label>
+              {!isEditingPassword ? (
+                <button type="button" className="account-inline-edit" onClick={startPasswordEditing}>
+                  {hasGoogleLogin ? "Set Password" : "Change Password"}
+                </button>
+              ) : null}
+            </div>
+
+            {!isEditingPassword ? (
+              <>
+                <p className="account-readonly-value account-password-dots">************</p>
+                <p className="account-password-note">
+                  {hasGoogleLogin
+                    ? "Google sign-in is linked. You can add a password too if you want email/password login."
+                    : "Use your current password to choose a new one."}
+                </p>
+              </>
+            ) : (
+              <div className="account-password-fields">
+                {!hasGoogleLogin ? (
+                  <div className="field">
+                    <label htmlFor="account-current-password">Current password</label>
+                    <input
+                      id="account-current-password"
+                      name="currentPassword"
+                      type="password"
+                      value={passwordForm.currentPassword}
+                      onChange={handlePasswordFieldChange}
+                      required
+                    />
+                  </div>
+                ) : null}
+
+                <div className="field">
+                  <label htmlFor="account-new-password">New password</label>
+                  <input
+                    id="account-new-password"
+                    name="newPassword"
+                    type="password"
+                    value={passwordForm.newPassword}
+                    onChange={handlePasswordFieldChange}
+                    minLength={8}
+                    required
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="account-confirm-password">Confirm new password</label>
+                  <input
+                    id="account-confirm-password"
+                    name="confirmPassword"
+                    type="password"
+                    value={passwordForm.confirmPassword}
+                    onChange={handlePasswordFieldChange}
+                    minLength={8}
+                    required
+                  />
+                </div>
+
+                <p className="account-password-note">
+                  {hasGoogleLogin
+                    ? "You can still keep using Google after setting a password."
+                    : "Your new password must be at least 8 characters."}
+                </p>
+
+                <div className="actions">
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={
+                      busy
+                      || passwordForm.newPassword.length < 8
+                      || passwordForm.newPassword !== passwordForm.confirmPassword
+                      || (!hasGoogleLogin && !passwordForm.currentPassword)
+                    }
+                  >
+                    Save Password
+                  </button>
+                  <button type="button" className="btn-ghost" onClick={cancelPasswordEditing} disabled={busy}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </form>
       </article>
     </section>

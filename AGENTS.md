@@ -2,10 +2,19 @@
 
 ## Scope
 - This file applies to all repositories under `C:\MambaSplit`.
-- `C:\MambaSplit\agent-templates\AGENTS.md` is the shared base policy.
-- Consuming repositories should sync this file into their repo root as `AGENTS.md`.
-- Repository-specific policy belongs in `AGENTS.repo.md`, which is appended to the synced base by `./scripts/sync-agents.ps1`.
-- When a repository has an `AGENTS.repo.md`, its contents override or refine the shared base for that repository only.
+- Repository-level `AGENTS.md` files may add stricter or more specific rules.
+- When rules conflict, the closest `AGENTS.md` to the target repo wins.
+
+## Multi-Repo Lockstep Policy
+- This policy is governed in lockstep across three files:
+  - C:\MambaSplit\MambaSplit.Api\AGENTS.md
+  - C:\MambaSplit\agent-templates\AGENTS.md
+  - C:\MambaSplit\mambasplit-web\AGENTS.md
+- Any policy-level AGENTS change must be applied consistently to all three files unless explicitly scoped otherwise.
+- If a conflict exists between the three files, stop and report:
+  1. conflicting section
+  2. proposed canonical wording
+  3. files requiring reconciliation
 
 ## Workflow Ownership Model
 - AGENTS.md defines policy requirements and invariants.
@@ -88,14 +97,6 @@ Branch protection requirements for `main` should also include:
   - risk-first-pr-reviewer
 - Frontend visual implementation agent:
   - ui-visual-implementer
-- Frontend engineering agent:
-  - expert-react-frontend-engineer
-- General autonomous coding agent:
-  - 4.1 Beast Mode v3.1
-- C#/.NET maintenance agent:
-  - csharp-dotnet-janitor
-- Email template design agent:
-  - email-template-designer
 - When these agents are available, prefer them over ad-hoc execution for their scope.
 - Agents must respect all safety, issue-linking, branch strategy, and failure behavior rules defined in this file.
 
@@ -103,7 +104,7 @@ Branch protection requirements for `main` should also include:
 - Prefer project-provided scripts if present.
 - For Java projects, prefer wrapper commands (`mvnw`, `gradlew`) over global installs.
 - For local infra, verify Docker daemon before running compose commands.
-- Before committing in consuming repositories, run `./scripts/sync-agents.ps1` to sync `.github/agents` from `agent-templates/agents` and rebuild `AGENTS.md` from the shared base plus any local `AGENTS.repo.md` overrides.
+- Before committing in consuming repositories, run `./scripts/sync-agents.ps1` to sync `.github/agents` from `agent-templates/agents`.
 
 ## Safety Rules
 - Never run destructive git commands unless explicitly requested.

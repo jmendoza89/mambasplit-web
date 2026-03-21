@@ -1,11 +1,128 @@
+import { AnimatePresence, motion } from "motion/react";
+import { useState } from "react";
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
 import { isGroupOwner as checkGroupOwnership } from "../utils/groupOwnership";
 import DashboardEmptyState from "./components/DashboardEmptyState";
 import DashboardGroupCardItem from "./components/DashboardGroupCardItem";
 import DashboardHero from "./components/DashboardHero";
-import DashboardInviteCard from "./components/DashboardInviteCard";
+import DashboardPendingInviteCard from "./components/DashboardPendingInviteCard";
 import DashboardSentInviteCard from "./components/DashboardSentInviteCard";
+import { groupService } from "../services/groupService";
+
+function RefreshInviteModal({ invite, busy, onCancel, onConfirm }) {
+  if (!invite) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="modal-overlay"
+        onClick={onCancel}
+        role="presentation"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.section
+          className="modal-card dashboard-refresh-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="refreshInviteModalTitle"
+          onClick={(e) => e.stopPropagation()}
+          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.98 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+        >
+          <div className="modal-header">
+            <div>
+              <h3 id="refreshInviteModalTitle">Refresh invite</h3>
+            </div>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={onCancel}
+              aria-label="Close refresh invite dialog"
+            >
+              x
+            </button>
+          </div>
+
+          <div className="dashboard-refresh-modal-body">
+            <p>
+              Delete the current invite for <strong>{invite.sentToEmail ?? "-"}</strong> and resend a new one?
+            </p>
+            <div className="actions modal-actions dashboard-refresh-modal-actions">
+              <button type="button" className="btn-secondary" onClick={onCancel} disabled={busy}>
+                Cancel
+              </button>
+              <button type="button" className="btn-primary" onClick={onConfirm} disabled={busy}>
+                Confirm Refresh
+              </button>
+            </div>
+          </div>
+        </motion.section>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function DeclineInviteModal({ invite, busy, onCancel, onConfirm }) {
+  if (!invite) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="modal-overlay"
+        onClick={onCancel}
+        role="presentation"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.section
+          className="modal-card dashboard-refresh-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="declineInviteModalTitle"
+          onClick={(e) => e.stopPropagation()}
+          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.98 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+        >
+          <div className="modal-header">
+            <div>
+              <h3 id="declineInviteModalTitle">Decline invite</h3>
+            </div>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={onCancel}
+              aria-label="Close decline invite dialog"
+            >
+              x
+            </button>
+          </div>
+
+          <div className="dashboard-refresh-modal-body">
+            <p>
+              Are you sure you want to decline the invite for <strong>{invite.groupName ?? invite.groupId ?? "Group"}</strong>?
+            </p>
+            <div className="actions modal-actions dashboard-refresh-modal-actions">
+              <button type="button" className="btn-secondary" onClick={onCancel} disabled={busy}>
+                Cancel
+              </button>
+              <button type="button" className="btn-danger" onClick={onConfirm} disabled={busy}>
+                Decline Invite
+              </button>
+            </div>
+          </div>
+        </motion.section>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
 
 export default function DashboardView({
   selectedGroupId,
@@ -26,6 +143,7 @@ export default function DashboardView({
   onCreateInvite,
   onAcceptPendingInvite,
   onDeleteInvite,
+  onRefreshInvite,
   onRefreshPendingInvites,
   setSelectedGroupId,
   setNewGroupName,
@@ -33,6 +151,8 @@ export default function DashboardView({
 }) {
   const { currentName, currentEmail, currentId, currentAvatarUrl, onLogout } = useAuth();
   const { busy } = useAlerts();
+  const [invitePendingRefresh, setInvitePendingRefresh] = useState(null);
+  const [invitePendingDecline, setInvitePendingDecline] = useState(null);
 
   function formatTimestamp(value) {
     if (!value) return "-";
@@ -54,6 +174,43 @@ export default function DashboardView({
     if (invite.sentByUserId !== currentId) return "Only the member who sent this invite can delete it.";
     if (!invite?.id && !invite?.token) return "Invite identifier is unavailable for this row.";
     return "Delete invite";
+  }
+
+  function refreshInviteActionTitle(invite) {
+    if (!invite?.sentByUserId) return "Invite sender is unavailable for this row.";
+    if (invite.sentByUserId !== currentId) return "Only the member who sent this invite can refresh it.";
+    if (!invite?.id && !invite?.token) return "Invite identifier is unavailable for this row.";
+    if (!invite?.sentToEmail) return "Invite recipient email is unavailable for this row.";
+    return "Refresh invite";
+  }
+
+  async function onConfirmRefreshInvite() {
+    if (!invitePendingRefresh) return;
+    await onRefreshInvite(invitePendingRefresh);
+    setInvitePendingRefresh(null);
+  }
+
+  async function onConfirmDeclineInvite() {
+    if (!invitePendingDecline) return;
+
+    try {
+      if (isUuid(invitePendingDecline.id)) {
+        await groupService.cancelInviteById(invitePendingDecline.groupId, invitePendingDecline.id);
+      } else {
+        await groupService.cancelInvite(invitePendingDecline.groupId, invitePendingDecline.token);
+      }
+      await onRefreshPendingInvites();
+      // lightweight feedback; controller alerts are preferred but not available here
+      window.alert("Invite deleted.");
+    } catch (err) {
+      window.alert(err?.message || "Could not decline invite.");
+    } finally {
+      setInvitePendingDecline(null);
+    }
+  }
+
+  function handleDecline(invite) {
+    setInvitePendingDecline(invite || null);
   }
 
   return (
@@ -141,17 +298,17 @@ export default function DashboardView({
             {!pendingInvitesLoading && !pendingInvitesError ? (
               <ul className="list dashboard-invite-list">
                 {pendingInvites.map((invite) => (
-                  <DashboardInviteCard
+                  <DashboardPendingInviteCard
                     key={invite.id}
                     groupName={invite.groupName}
-                    email={invite.sentToEmail ?? invite.email}
+                    senderName={invite.senderName}
+                    senderEmail={invite.senderEmail}
                     createdAt={formatTimestamp(invite.createdAt)}
                     expiresAt={formatTimestamp(invite.expiresAt)}
-                    emailLabel="Email"
                     actionLabel="Accept"
                     onAction={() => onAcceptPendingInvite(invite.id)}
+                    onDecline={() => handleDecline(invite)}
                     actionDisabled={busy || pendingInvitesLoading}
-                    variant="pending"
                   />
                 ))}
                 {!pendingInvites.length ? (
@@ -178,13 +335,15 @@ export default function DashboardView({
                 <DashboardSentInviteCard
                   key={invite.id}
                   groupName={invite.groupName}
-                  email={invite.sentToEmail ?? invite.email}
-                  createdAt={formatTimestamp(invite.createdAt)}
-                  expiresAt={formatTimestamp(invite.expiresAt)}
-                  actionLabel="Delete"
-                  onAction={() => onDeleteInvite(invite)}
+                  recipientEmail={invite.sentToEmail}
+                  senderName={invite.sentByDisplayName ?? invite.senderName}
+                  senderEmail={invite.sentByEmail ?? invite.senderEmail}
+                  expiresAt={invite.expiresAt}
+                  onDelete={() => onDeleteInvite(invite)}
+                  onRefresh={() => setInvitePendingRefresh(invite)}
                   actionDisabled={busy || !canDeleteSentInvite(invite)}
-                  actionTitle={deleteInviteActionTitle(invite)}
+                  deleteTitle={deleteInviteActionTitle(invite)}
+                  refreshTitle={refreshInviteActionTitle(invite)}
                   highlighted={inviteResult?.token === invite.token}
                 />
               ))}
@@ -257,6 +416,25 @@ export default function DashboardView({
           </article>
         </div>
       </article>
+
+      <AnimatePresence>
+        {invitePendingRefresh ? (
+          <RefreshInviteModal
+            invite={invitePendingRefresh}
+            busy={busy}
+            onCancel={() => setInvitePendingRefresh(null)}
+            onConfirm={onConfirmRefreshInvite}
+          />
+        ) : null}
+        {invitePendingDecline ? (
+          <DeclineInviteModal
+            invite={invitePendingDecline}
+            busy={busy}
+            onCancel={() => setInvitePendingDecline(null)}
+            onConfirm={onConfirmDeclineInvite}
+          />
+        ) : null}
+      </AnimatePresence>
     </section>
   );
 }

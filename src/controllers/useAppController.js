@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getStoredUser } from "../api";
+import { getStoredUser, meApi } from "../api";
 import { fetchSessionData } from "../services";
 import {
   consumeMockPasswordResetToken,
@@ -68,7 +68,14 @@ export function useAppController() {
 <<<<<<< HEAD
 =======
   const currentAvatarUrl = useMemo(() => accountProfile.avatarUrl || "", [accountProfile.avatarUrl]);
+<<<<<<< HEAD
 >>>>>>> 4de936c (Add account dropdown and profile page)
+=======
+  const currentHasGoogleLogin = useMemo(
+    () => Boolean((me && me.hasGoogleLogin) || (user && user.hasGoogleLogin)),
+    [me, user]
+  );
+>>>>>>> 320b52a (Finalize auth and dashboard updates)
   const showResetTestHarness = useMemo(
     () => import.meta.env.MODE !== "production" || import.meta.env.VITE_ENABLE_RESET_TEST_HARNESS === "true",
     []
@@ -140,6 +147,7 @@ export function useAppController() {
     setBusy,
     currentId,
     currentEmail,
+    me,
     loadSessionData,
     onOpenGroupPage: groupController.actions.onOpenGroupPage
   });
@@ -326,7 +334,26 @@ export function useAppController() {
     setError("");
   }, [setError, setSuccess, setUser, setMe]);
 
+<<<<<<< HEAD
 >>>>>>> 4de936c (Add account dropdown and profile page)
+=======
+  const onChangePassword = useCallback(async ({ currentPassword, newPassword }) => {
+    setError("");
+    setSuccess("");
+    setBusy(true);
+
+    try {
+      await meApi.changePassword(currentPassword, newPassword);
+      setSuccess(currentHasGoogleLogin ? "Password saved for this account." : "Password updated.");
+    } catch (err) {
+      setError(err.message || "Unable to update password.");
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  }, [currentHasGoogleLogin]);
+
+>>>>>>> 320b52a (Finalize auth and dashboard updates)
   return {
     state: {
       authMode,
@@ -346,6 +373,7 @@ export function useAppController() {
       currentPhone,
       currentId,
       currentAvatarUrl,
+      currentHasGoogleLogin,
       groupLoading: groupController.state.groupLoading,
       groupError: groupController.state.groupError || groupError,
       isGroupOwner: groupController.state.isGroupOwner,
@@ -386,9 +414,11 @@ export function useAppController() {
       resetTokenStatus,
       passwordResetOutbox,
       passwordResetTestValue,
-      showResetTestHarness
+      showResetTestHarness,
+      googleButtonStatus: authController.googleButtonStatus
     },
     refs: {
+      googleButtonRef: authController.googleButtonRef,
       expenseDescriptionRef: groupController.refs.expenseDescriptionRef,
       expenseAmountRef: groupController.refs.expenseAmountRef
     },
@@ -417,11 +447,16 @@ export function useAppController() {
 <<<<<<< HEAD
 =======
       onSaveAccountProfile,
+<<<<<<< HEAD
 >>>>>>> 4de936c (Add account dropdown and profile page)
+=======
+      onChangePassword,
+>>>>>>> 320b52a (Finalize auth and dashboard updates)
       onCreateGroup: dashboardController.actions.onCreateGroup,
       onCreateInvite: dashboardController.actions.onCreateInvite,
       onAcceptPendingInvite: dashboardController.actions.onAcceptPendingInvite,
       onDeleteInvite: dashboardController.actions.onDeleteInvite,
+      onRefreshInvite: dashboardController.actions.onRefreshInvite,
       onRefreshPendingInvites: dashboardController.actions.onRefreshPendingInvites,
       onOpenGroupPage: groupController.actions.onOpenGroupPage,
       onCreateExpense: groupController.actions.onCreateExpense,

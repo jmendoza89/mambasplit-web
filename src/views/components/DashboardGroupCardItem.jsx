@@ -1,22 +1,5 @@
 import { formatMoney, initials } from "../../utils/formatters";
-
-function pickFirstNumber(candidates, fallback = 0) {
-  const found = candidates.find((value) => typeof value === "number" && Number.isFinite(value));
-  return typeof found === "number" ? found : fallback;
-}
-
-function resolveGroupBalanceCents(group) {
-  return pickFirstNumber([
-    group?.myNetBalanceCents,
-    group?.netBalanceCents,
-    group?.myBalanceCents,
-    group?.balanceCents,
-    group?.summary?.myNetBalanceCents,
-    group?.summary?.netBalanceCents,
-    group?.summary?.myBalanceCents,
-    group?.summary?.balanceCents
-  ]);
-}
+import { pickFirstNumber, resolveGroupBalanceCents } from "../../utils/groupBalance";
 
 function getBalancePresentation(balanceCents) {
   const amount = Math.abs(balanceCents || 0) / 100;

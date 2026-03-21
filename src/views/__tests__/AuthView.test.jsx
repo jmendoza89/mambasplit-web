@@ -11,8 +11,8 @@ describe("AuthView", () => {
     const setEmail = vi.fn();
     const setPassword = vi.fn();
     const onSubmitAuth = vi.fn((e) => e.preventDefault());
-    const onGoogleLogin = vi.fn();
     const onStartPasswordReset = vi.fn();
+    const googleButtonRef = vi.fn();
 
     const authContextValue = {
       user: null,
@@ -36,7 +36,9 @@ describe("AuthView", () => {
       setResetConfirmPassword: vi.fn(),
       setDisplayName,
       onSubmitAuth,
-      onGoogleLogin,
+      onGoogleLogin: vi.fn(),
+      googleButtonRef,
+      googleButtonStatus: "loading",
       onLogout: vi.fn(),
       onToggleAuthMode,
       onStartPasswordReset,
@@ -65,8 +67,9 @@ describe("AuthView", () => {
     );
 
     expect(screen.getByLabelText("Display Name")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Sign up with Google" }));
-    expect(onGoogleLogin).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Sign up with Google")).toBeInTheDocument();
+    expect(screen.getByText("Loading Google Sign-In..."))
+      .toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Forgot password?" }));
     expect(onStartPasswordReset).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("link", { name: "Login" }));
@@ -103,6 +106,8 @@ describe("AuthView", () => {
       setDisplayName: vi.fn(),
       onSubmitAuth: vi.fn(),
       onGoogleLogin: vi.fn(),
+      googleButtonRef: vi.fn(),
+      googleButtonStatus: "ready",
       onLogout: vi.fn(),
       onToggleAuthMode: vi.fn(),
       onStartPasswordReset: vi.fn(),

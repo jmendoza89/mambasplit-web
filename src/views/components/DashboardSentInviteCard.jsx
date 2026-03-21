@@ -1,18 +1,28 @@
+function getDaysUntilExpire(expiresAt) {
+  if (!expiresAt) return null;
+  const expiryTime = new Date(expiresAt).getTime();
+  if (!Number.isFinite(expiryTime)) return null;
+  const msPerDay = 1000 * 60 * 60 * 24;
+  return Math.ceil((expiryTime - Date.now()) / msPerDay);
+}
+
 function joinClasses(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
 export default function DashboardSentInviteCard({
   groupName,
-  email,
-  createdAt,
+  recipientEmail,
   expiresAt,
-  actionLabel,
-  onAction,
+  onDelete,
+  onRefresh,
   actionDisabled = false,
-  actionTitle,
+  deleteTitle,
+  refreshTitle,
   highlighted = false
 }) {
+  const daysUntilExpire = getDaysUntilExpire(expiresAt);
+
   return (
     <li
       className={joinClasses(
@@ -23,26 +33,46 @@ export default function DashboardSentInviteCard({
       )}
     >
       <div className="dashboard-sent-invite-head">
-        <strong className="dashboard-sent-invite-group">{groupName || "Group"}</strong>
-        <button
-          type="button"
-          className="btn-inline dashboard-invite-action dashboard-sent-invite-action"
-          onClick={onAction}
-          disabled={actionDisabled}
-          title={actionTitle}
-        >
-          {actionLabel}
-        </button>
+        <div className="dashboard-sent-invite-copy">
+          <div className="dashboard-sent-invite-group-row">
+            <strong className="dashboard-sent-invite-group">{groupName || "Group"}</strong>
+            {daysUntilExpire !== null && (
+              <time
+                className="dashboard-sent-invite-days"
+                data-tooltip={expiresAt ? new Date(expiresAt).toLocaleString() : ""}
+                dateTime={expiresAt || undefined}
+                aria-label={expiresAt ? `Expires at ${new Date(expiresAt).toLocaleString()}` : undefined}
+              >
+                {`${daysUntilExpire} days until expire`}
+              </time>
+            )}
+          </div>
+          <p className="dashboard-sent-invite-to"><span className="sr-only">To:</span> {recipientEmail || "-"}</p>
+        </div>
+
+        <div className="dashboard-sent-invite-actions">
+          <button
+            type="button"
+            className="btn-inline dashboard-invite-action dashboard-sent-invite-refresh"
+            onClick={onRefresh}
+            disabled={actionDisabled}
+            title={refreshTitle}
+          >
+            Refresh
+          </button>
+          <button
+            type="button"
+            className="btn-inline dashboard-invite-action dashboard-sent-invite-action"
+            onClick={onDelete}
+            disabled={actionDisabled}
+            title={deleteTitle}
+          >
+            Delete
+          </button>
+        </div>
       </div>
 
-      <p className="dashboard-sent-invite-to">
-        <strong>To:</strong> {email || "-"}
-      </p>
-
-      <div className="dashboard-sent-invite-meta">
-        <p><strong>Sent:</strong> {createdAt || "-"}</p>
-        <p><strong>Expires:</strong> {expiresAt || "-"}</p>
-      </div>
+      {/* Meta area removed; expiry moved inline with group name and shows full date on hover */}
     </li>
   );
 }

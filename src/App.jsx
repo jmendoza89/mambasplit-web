@@ -41,6 +41,8 @@ export default function App() {
     setDisplayName: actions.setDisplayName,
     onSubmitAuth: actions.onSubmitAuth,
     onGoogleLogin: actions.onGoogleLogin,
+    googleButtonRef: refs.googleButtonRef,
+    googleButtonStatus: state.googleButtonStatus,
     onLogout: actions.onLogout,
     onToggleAuthMode: actions.onToggleAuthMode,
     onStartPasswordReset: actions.onStartPasswordReset,
@@ -73,6 +75,8 @@ export default function App() {
     actions.setDisplayName,
     actions.onSubmitAuth,
     actions.onGoogleLogin,
+    refs.googleButtonRef,
+    state.googleButtonStatus,
     actions.onLogout,
     actions.onToggleAuthMode,
     actions.onStartPasswordReset,
@@ -147,6 +151,7 @@ export default function App() {
             onCreateInvite={actions.onCreateInvite}
             onAcceptPendingInvite={actions.onAcceptPendingInvite}
             onDeleteInvite={actions.onDeleteInvite}
+            onRefreshInvite={actions.onRefreshInvite}
             onRefreshPendingInvites={actions.onRefreshPendingInvites}
             onStartPasswordReset={actions.onStartPasswordReset}
             setSelectedGroupId={actions.setSelectedGroupId}
@@ -159,9 +164,11 @@ export default function App() {
             currentEmail={state.currentEmail}
             currentPhone={state.currentPhone}
             currentAvatarUrl={state.currentAvatarUrl}
+            hasGoogleLogin={state.currentHasGoogleLogin}
             busy={state.busy}
             onBackToDashboard={() => actions.setActiveView("dashboard")}
             onSaveAccountProfile={actions.onSaveAccountProfile}
+            onChangePassword={actions.onChangePassword}
           />
         ) : (
           <GroupView

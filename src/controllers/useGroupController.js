@@ -113,6 +113,18 @@ export function useGroupController({
     try {
       const detail = await groupService.details(groupId);
       setGroupDetail(detail);
+
+      // Sync the user's personal balance from detail back into the groups list
+      // so the dashboard card reflects the same balance shown in the group view.
+      const syncedBalance = detail?.me?.netBalanceCents ?? detail?.summary?.netBalanceCents;
+      if (typeof syncedBalance === "number") {
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === groupId ? { ...g, netBalanceCents: syncedBalance } : g
+          )
+        );
+      }
+
       setGroupDetailStatusById((prev) => {
         if (!(groupId in prev)) return prev;
         const next = { ...prev };

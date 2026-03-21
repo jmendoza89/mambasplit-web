@@ -35,6 +35,8 @@ export const AuthContext = createContext({
   setDisplayName: () => {},
   onSubmitAuth: () => {},
   onGoogleLogin: () => {},
+  googleButtonRef: null,
+  googleButtonStatus: "idle",
   onLogout: () => {},
   onToggleAuthMode: () => {},
   onStartPasswordReset: () => {},
