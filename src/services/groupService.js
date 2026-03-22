@@ -18,6 +18,7 @@ export const groupService = {
   acceptInvite: groupsApi.acceptInvite,
   listPendingInvitesByEmail: invitesApi.listPendingByEmail,
   acceptPendingInviteById: invitesApi.acceptById,
+  leaveGroup: groupsApi.leaveGroup,
   createEqualExpense: groupsApi.createEqualExpense,
   deleteExpense: groupsApi.deleteExpense,
   createSettlement: groupsApi.createSettlement,

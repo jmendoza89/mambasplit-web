@@ -45,6 +45,7 @@ export function useGroupController({
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseSavedStatus, setExpenseSavedStatus] = useState(null);
   const [isSettleUpModalOpen, setIsSettleUpModalOpen] = useState(false);
+  const [isLeaveGroupModalOpen, setIsLeaveGroupModalOpen] = useState(false);
   const [recentSettlementId, setRecentSettlementId] = useState(null);
   const expenseDescriptionRef = useRef(null);
   const expenseAmountRef = useRef(null);
@@ -385,6 +386,46 @@ export function useGroupController({
     setIsSettleUpModalOpen(false);
   }
 
+  function onOpenLeaveGroupModal() {
+    if (!selectedGroupId) return;
+    setIsLeaveGroupModalOpen(true);
+  }
+
+  function onCancelLeaveGroup() {
+    setIsLeaveGroupModalOpen(false);
+  }
+
+  async function onConfirmLeaveGroup() {
+    if (!selectedGroupId) return;
+    setError("");
+    setSuccess("");
+    setBusy(true);
+    try {
+      await groupService.leaveGroup(selectedGroupId);
+      const leftId = selectedGroupId;
+      const remaining = groups.filter((group) => group.id !== leftId);
+      setGroups(remaining);
+      setSelectedGroupId((remaining[0] && remaining[0].id) || "");
+      setGroupDetail(null);
+      setGroupError("");
+      setLocalGroupError("");
+      setGroupDetailStatusById((prev) => {
+        if (!(leftId in prev)) return prev;
+        const next = { ...prev };
+        delete next[leftId];
+        return next;
+      });
+      setIsLeaveGroupModalOpen(false);
+      setActiveView("dashboard");
+      setSuccess("You have left the group.");
+    } catch (err) {
+      setError(err.message || "Could not leave group.");
+      setIsLeaveGroupModalOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function onResetGroupState() {
     setExpenseDescription("");
     setExpenseAmount("");
@@ -414,6 +455,7 @@ export function useGroupController({
       totalSettlementAmount,
       isExpenseModalOpen,
       isSettleUpModalOpen,
+      isLeaveGroupModalOpen,
       recentSettlementId,
       expenseDescription,
       expenseAmount,
@@ -435,6 +477,9 @@ export function useGroupController({
       onCreateSettlement,
       onDeleteExpense,
       onDeleteGroup,
+      onOpenLeaveGroupModal,
+      onCancelLeaveGroup,
+      onConfirmLeaveGroup,
       onRefreshGroupDetail: () => loadGroupDetail(selectedGroupId, { force: true }),
       setExpenseDescription,
       setExpenseAmount,

@@ -3,7 +3,7 @@ name: git-actions
 description: "Workspace prompt for generating and reviewing all git branch/commit/PR actions. Uses the `risk-first-pr-reviewer` agent to prioritize risk and correctness."
 scope: workspace
 applyTo: "**"
-agent: risk-first-pr-reviewer
+agent: feature-workflow-manager
 model: gpt-5-mini
 model_mapping:
   review_short: gpt-4.1

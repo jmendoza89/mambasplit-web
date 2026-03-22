@@ -138,6 +138,7 @@ describe("AuthView", () => {
     fireEvent.submit(screen.getByRole("button", { name: "Send Reset Link" }).closest("form"));
     expect(onRequestPasswordReset).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("password-reset-harness")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Password Reset Test Harness"));
     fireEvent.click(screen.getByRole("button", { name: "Open Reset Link" }));
     expect(onOpenPasswordResetLink).toHaveBeenCalledWith("/?resetToken=abc123");
     expect(screen.getByText("secret-for-test")).toBeInTheDocument();

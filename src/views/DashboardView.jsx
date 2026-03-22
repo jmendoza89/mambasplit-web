@@ -318,7 +318,7 @@ export default function DashboardView({
                     className="list-empty dashboard-empty-state-inline"
                     title="No pending invites"
                     detail="You are all caught up right now."
-                    icon="v"
+                    icon="envelope"
                   />
                 ) : null}
               </ul>

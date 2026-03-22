@@ -158,12 +158,18 @@ export default function AccountView({
   }
 
   const isEditingAvatar = editingField === "avatar";
+  const summaryName = form.displayName || currentName || "Your profile";
+  const summaryEmail = form.email || currentEmail || "Add an email address";
 
   return (
     <section className="dash-wrap">
       <article className="card panel account-page">
         <div className="account-page-header">
-          <h2>Your account</h2>
+          <div className="account-page-title-block">
+            <p className="account-eyebrow">Account settings</p>
+            <h2>Your account</h2>
+            <p className="account-page-subtitle">Manage your profile, sign-in details, and the way your account shows up across MambaSplit.</p>
+          </div>
           <div className="account-page-top">
             <button className="btn-ghost" type="button" onClick={onBackToDashboard}>
               Back to Dashboard
@@ -198,6 +204,12 @@ export default function AccountView({
           </section>
 
           <section className="account-fields">
+            <div className="account-summary-card">
+              <p className="account-summary-label">Profile overview</p>
+              <h3>{summaryName}</h3>
+              <p>{summaryEmail}</p>
+            </div>
+
             {renderEditableRow({
               field: "displayName",
               label: "Your name",

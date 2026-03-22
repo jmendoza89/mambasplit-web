@@ -1,8 +1,8 @@
 ---
-name: "React UI Change"
-description: "Workspace-scoped prompt to request focused UI changes to React components using the Expert React Frontend Engineer agent."
+name: "React UI Plan"
+description: "Workspace-scoped prompt to request focused UI changes to React components using the Expert React Frontend Engineer agent. Uses GPT-5 mini."
 agent: "Expert React Frontend Engineer"
-model: "Claude Sonnet 4.6"
+model: "GPT-4.1"
 related_skill: "agent-customization"
 ---
 
@@ -92,5 +92,5 @@ Verification checklist (examples)
 - Tests: run `pnpm test` or `npm test` and include failing test details if any.
 
 Related files
-- Save location: `.github/prompts/expert-react-ui-change.prompt.md` (workspace-scoped).
+- Save location: `.github/prompts/react-ui-plan.prompt.md` (workspace-scoped).
 - Related agent: `.github/agents/expert-react-frontend-engineer.agent.md`.

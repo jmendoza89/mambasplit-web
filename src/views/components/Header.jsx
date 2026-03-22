@@ -4,7 +4,7 @@ export default function Header() {
       <div className="brand-mark" aria-hidden="true" />
       <div>
         <h1>MambaSplit</h1>
-        <p>Simple split expenses, fast.</p>
+        <p>Track it, split it, settle it.</p>
       </div>
     </header>
   );
