@@ -3,9 +3,12 @@ import { clearSession, getAccessToken, saveSession } from "../api";
 import { authService, submitAuth, submitGoogleAuth } from "../services";
 
 const GOOGLE_SCRIPT_ID = "google-identity-services-script";
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_TOKEN_MISSING_ERROR = "Google login failed: no ID token was returned. Please try again.";
 let googleScriptPromise = null;
+
+function getGoogleClientId() {
+  return import.meta.env.VITE_GOOGLE_CLIENT_ID;
+}
 
 function toGoogleLoginError(notification) {
   const notDisplayedReason = notification?.getNotDisplayedReason?.();
@@ -72,7 +75,9 @@ export function useAuthController({
 }) {
   const isAuthenticated = Boolean(getAccessToken());
   const [googleButtonNode, setGoogleButtonNode] = useState(null);
-  const [googleButtonStatus, setGoogleButtonStatus] = useState(GOOGLE_CLIENT_ID ? "loading" : "unconfigured");
+  const [googleButtonStatus, setGoogleButtonStatus] = useState(() => (
+    getGoogleClientId() ? "loading" : "unconfigured"
+  ));
 
   useEffect(() => {
     (async () => {
@@ -149,7 +154,8 @@ export function useAuthController({
     const container = googleButtonNode;
     if (!container) return;
 
-    if (!GOOGLE_CLIENT_ID) {
+    const googleClientId = getGoogleClientId();
+    if (!googleClientId) {
       container.innerHTML = "";
       setGoogleButtonStatus("unconfigured");
       return;
@@ -166,7 +172,7 @@ export function useAuthController({
         }
 
         window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
+          client_id: googleClientId,
           callback: onGoogleLoginSuccess
         });
 
@@ -203,7 +209,8 @@ export function useAuthController({
     setError("");
     setSuccess("");
 
-    if (!GOOGLE_CLIENT_ID) {
+    const googleClientId = getGoogleClientId();
+    if (!googleClientId) {
       setError("Google login is not configured.");
       return;
     }
@@ -215,7 +222,7 @@ export function useAuthController({
       }
 
       window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
+        client_id: googleClientId,
         callback: onGoogleLoginSuccess
       });
 

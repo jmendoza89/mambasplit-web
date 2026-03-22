@@ -22,6 +22,7 @@ vi.mock("../../services", () => ({
 
 describe("useAuthController", () => {
   it("surfaces the Google prompt reason when the prompt is not displayed", async () => {
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "test-google-client-id");
     window.google = {
       accounts: {
         id: {
@@ -84,6 +85,7 @@ describe("useAuthController", () => {
     expect(setError).toHaveBeenCalledWith(
       "Google login failed: prompt was not displayed (unregistered_origin)."
     );
+    vi.unstubAllEnvs();
   });
 
   it("submits auth and refreshes session data", async () => {
