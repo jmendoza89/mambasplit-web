@@ -50,10 +50,9 @@ export function useAppController() {
   const [resetTokenStatus, setResetTokenStatus] = useState("idle");
   const [passwordResetOutbox, setPasswordResetOutbox] = useState(null);
   const [passwordResetTestValue, setPasswordResetTestValue] = useState("");
-<<<<<<< HEAD
-=======
+
   const [accountProfile, setAccountProfile] = useState(() => getStoredProfile());
->>>>>>> 4de936c (Add account dropdown and profile page)
+
 
   const currentName = useMemo(
     () => accountProfile.displayName || (me && me.displayName) || (user && user.displayName) || "User",
@@ -65,24 +64,47 @@ export function useAppController() {
   );
   const currentPhone = useMemo(() => accountProfile.phone || "", [accountProfile.phone]);
   const currentId = useMemo(() => (me && me.id) || (user && user.id) || "-", [me, user]);
-<<<<<<< HEAD
-=======
   const currentAvatarUrl = useMemo(() => accountProfile.avatarUrl || "", [accountProfile.avatarUrl]);
-<<<<<<< HEAD
->>>>>>> 4de936c (Add account dropdown and profile page)
-=======
   const currentHasGoogleLogin = useMemo(
     () => Boolean((me && me.hasGoogleLogin) || (user && user.hasGoogleLogin)),
     [me, user]
   );
->>>>>>> 320b52a (Finalize auth and dashboard updates)
+
+  const currentAvatarUrl = useMemo(() => accountProfile.avatarUrl || "", [accountProfile.avatarUrl]);
+
+
+
+  const currentHasGoogleLogin = useMemo(
+    () => Boolean((me && me.hasGoogleLogin) || (user && user.hasGoogleLogin)),
+    [me, user]
+  );
+
   const showResetTestHarness = useMemo(
     () => import.meta.env.MODE !== "production" || import.meta.env.VITE_ENABLE_RESET_TEST_HARNESS === "true",
     []
   );
   const isResetAuthMode = authMode === "resetRequest" || authMode === "resetPassword";
-<<<<<<< HEAD
-=======
+  useEffect(() => {
+    setAccountProfile((prev) => {
+      const baseDisplayName = me?.displayName || user?.displayName || "";
+      const baseEmail = me?.email || user?.email || "";
+      const isDifferentUser = Boolean(prev.email && baseEmail && prev.email !== baseEmail);
+      const next = {
+        displayName: isDifferentUser ? baseDisplayName : (prev.displayName || baseDisplayName),
+        email: isDifferentUser ? baseEmail : (prev.email || baseEmail),
+        phone: isDifferentUser ? "" : (prev.phone || ""),
+        avatarUrl: isDifferentUser ? "" : (prev.avatarUrl || "")
+      };
+
+      if (JSON.stringify(next) === JSON.stringify(prev)) {
+        return prev;
+      }
+
+      window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, [me, user]);
+
 
   useEffect(() => {
     setAccountProfile((prev) => {
@@ -104,7 +126,7 @@ export function useAppController() {
       return next;
     });
   }, [me, user]);
->>>>>>> 4de936c (Add account dropdown and profile page)
+
 
   const loadSessionData = useCallback(async () => {
     const { me: meData, groups: groupData } = await fetchSessionData();
@@ -304,8 +326,6 @@ export function useAppController() {
     }
   }, [password, resetConfirmPassword, resetToken]);
 
-<<<<<<< HEAD
-=======
   const onSaveAccountProfile = useCallback((nextProfile) => {
     const normalized = {
       displayName: (nextProfile?.displayName || "").trim(),
@@ -334,9 +354,6 @@ export function useAppController() {
     setError("");
   }, [setError, setSuccess, setUser, setMe]);
 
-<<<<<<< HEAD
->>>>>>> 4de936c (Add account dropdown and profile page)
-=======
   const onChangePassword = useCallback(async ({ currentPassword, newPassword }) => {
     setError("");
     setSuccess("");
@@ -353,7 +370,54 @@ export function useAppController() {
     }
   }, [currentHasGoogleLogin]);
 
->>>>>>> 320b52a (Finalize auth and dashboard updates)
+  const onSaveAccountProfile = useCallback((nextProfile) => {
+    const normalized = {
+      displayName: (nextProfile?.displayName || "").trim(),
+      email: (nextProfile?.email || "").trim(),
+      phone: (nextProfile?.phone || "").trim(),
+      avatarUrl: nextProfile?.avatarUrl || ""
+    };
+
+    setAccountProfile(normalized);
+    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(normalized));
+    setUser((prev) => (prev ? {
+      ...prev,
+      displayName: normalized.displayName || prev.displayName,
+      email: normalized.email || prev.email,
+      phone: normalized.phone,
+      avatarUrl: normalized.avatarUrl
+    } : prev));
+    setMe((prev) => (prev ? {
+      ...prev,
+      displayName: normalized.displayName || prev.displayName,
+      email: normalized.email || prev.email,
+      phone: normalized.phone,
+      avatarUrl: normalized.avatarUrl
+    } : prev));
+    setSuccess("Account details updated on this device.");
+    setError("");
+  }, [setError, setSuccess, setUser, setMe]);
+
+
+
+
+  const onChangePassword = useCallback(async ({ currentPassword, newPassword }) => {
+    setError("");
+    setSuccess("");
+    setBusy(true);
+
+    try {
+      await meApi.changePassword(currentPassword, newPassword);
+      setSuccess(currentHasGoogleLogin ? "Password saved for this account." : "Password updated.");
+    } catch (err) {
+      setError(err.message || "Unable to update password.");
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  }, [currentHasGoogleLogin]);
+
+
   return {
     state: {
       authMode,
@@ -444,14 +508,9 @@ export function useAppController() {
       onRequestPasswordReset,
       onOpenPasswordResetLink,
       onSubmitPasswordReset,
-<<<<<<< HEAD
-=======
       onSaveAccountProfile,
-<<<<<<< HEAD
->>>>>>> 4de936c (Add account dropdown and profile page)
-=======
       onChangePassword,
->>>>>>> 320b52a (Finalize auth and dashboard updates)
+
       onCreateGroup: dashboardController.actions.onCreateGroup,
       onCreateInvite: dashboardController.actions.onCreateInvite,
       onAcceptPendingInvite: dashboardController.actions.onAcceptPendingInvite,
