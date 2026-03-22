@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAccessToken } from "../api";
 import { isValidGroupName } from "../models";
 import { groupService } from "../services";
@@ -192,6 +192,9 @@ export function useDashboardController({
   const [inviteCandidatesLoading, setInviteCandidatesLoading] = useState(false);
   const [groupOwnershipById, setGroupOwnershipById] = useState({});
   const groupsSignature = groups.map((group) => `${group?.id || ""}:${group?.name || ""}`).join("|");
+  // Keep a stable group reference for effects that only care about id/name changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const groupsForEffects = useMemo(() => groups, [groupsSignature]);
 
   useEffect(() => {
     setGroupOwnershipById({});
@@ -203,14 +206,14 @@ export function useDashboardController({
     let cancelled = false;
 
     async function resolveOwnership() {
-      if (!groups.length) {
+      if (!groupsForEffects.length) {
         if (!cancelled && Object.keys(groupOwnershipById).length > 0) {
           setGroupOwnershipById({});
         }
         return;
       }
 
-      const unresolved = groups
+      const unresolved = groupsForEffects
         .map((group) => group?.id)
         .filter((groupId) => groupId && groupOwnershipById[groupId] === undefined);
 
@@ -245,7 +248,7 @@ export function useDashboardController({
         });
 
         Object.keys(next).forEach((groupId) => {
-          if (!groups.some((group) => group.id === groupId)) {
+          if (!groupsForEffects.some((group) => group.id === groupId)) {
             delete next[groupId];
           }
         });
@@ -258,7 +261,7 @@ export function useDashboardController({
     return () => {
       cancelled = true;
     };
-  }, [currentId, groupOwnershipById, groupsSignature, groups, setGroups]);
+  }, [currentId, groupOwnershipById, groupsForEffects, groupsSignature, setGroups]);
 
   const loadPendingInvites = useCallback(async () => {
     if (!getAccessToken() || !currentEmail || currentEmail === "-") {
@@ -339,7 +342,7 @@ export function useDashboardController({
       return;
     }
 
-    if (!groups.length) {
+    if (!groupsForEffects.length) {
       setSentInvites([]);
       return;
     }
@@ -354,13 +357,13 @@ export function useDashboardController({
             .map((invite) => normalizeSentInvite(invite, {
               currentId,
               fallbackGroupId: invite?.groupId || "",
-              fallbackGroupName: invite?.groupName || groups.find((group) => group.id === invite?.groupId)?.name || "Group"
+              fallbackGroupName: invite?.groupName || groupsForEffects.find((group) => group.id === invite?.groupId)?.name || "Group"
             }))
             .filter(Boolean)
         ];
       } else {
         inviteResults = await Promise.all(
-          groups.map(async (group) => {
+          groupsForEffects.map(async (group) => {
             try {
               const invites = await groupService.listGroupInvites(group.id);
               if (!Array.isArray(invites)) return [];
@@ -387,7 +390,7 @@ export function useDashboardController({
     return () => {
       cancelled = true;
     };
-  }, [currentId, groupsSignature, me, groups]);
+  }, [currentId, groupsForEffects, groupsSignature, me]);
 
   async function onCreateGroup(e) {
     e.preventDefault();
