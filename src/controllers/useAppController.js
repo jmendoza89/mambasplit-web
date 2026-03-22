@@ -64,20 +64,10 @@ export function useAppController() {
   );
   const currentPhone = useMemo(() => accountProfile.phone || "", [accountProfile.phone]);
   const currentId = useMemo(() => (me && me.id) || (user && user.id) || "-", [me, user]);
-  const currentAvatarUrl = useMemo(() => accountProfile.avatarUrl || "", [accountProfile.avatarUrl]);
-  const currentHasGoogleLogin = useMemo(
-    () => Boolean((me && me.hasGoogleLogin) || (user && user.hasGoogleLogin)),
-    [me, user]
-  );
-
-  const currentAvatarUrl = useMemo(() => accountProfile.avatarUrl || "", [accountProfile.avatarUrl]);
 
 
 
-  const currentHasGoogleLogin = useMemo(
-    () => Boolean((me && me.hasGoogleLogin) || (user && user.hasGoogleLogin)),
-    [me, user]
-  );
+
 
   const showResetTestHarness = useMemo(
     () => import.meta.env.MODE !== "production" || import.meta.env.VITE_ENABLE_RESET_TEST_HARNESS === "true",
@@ -326,96 +316,12 @@ export function useAppController() {
     }
   }, [password, resetConfirmPassword, resetToken]);
 
-  const onSaveAccountProfile = useCallback((nextProfile) => {
-    const normalized = {
-      displayName: (nextProfile?.displayName || "").trim(),
-      email: (nextProfile?.email || "").trim(),
-      phone: (nextProfile?.phone || "").trim(),
-      avatarUrl: nextProfile?.avatarUrl || ""
-    };
-
-    setAccountProfile(normalized);
-    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(normalized));
-    setUser((prev) => (prev ? {
-      ...prev,
-      displayName: normalized.displayName || prev.displayName,
-      email: normalized.email || prev.email,
-      phone: normalized.phone,
-      avatarUrl: normalized.avatarUrl
-    } : prev));
-    setMe((prev) => (prev ? {
-      ...prev,
-      displayName: normalized.displayName || prev.displayName,
-      email: normalized.email || prev.email,
-      phone: normalized.phone,
-      avatarUrl: normalized.avatarUrl
-    } : prev));
-    setSuccess("Account details updated on this device.");
-    setError("");
-  }, [setError, setSuccess, setUser, setMe]);
-
-  const onChangePassword = useCallback(async ({ currentPassword, newPassword }) => {
-    setError("");
-    setSuccess("");
-    setBusy(true);
-
-    try {
-      await meApi.changePassword(currentPassword, newPassword);
-      setSuccess(currentHasGoogleLogin ? "Password saved for this account." : "Password updated.");
-    } catch (err) {
-      setError(err.message || "Unable to update password.");
-      throw err;
-    } finally {
-      setBusy(false);
-    }
-  }, [currentHasGoogleLogin]);
-
-  const onSaveAccountProfile = useCallback((nextProfile) => {
-    const normalized = {
-      displayName: (nextProfile?.displayName || "").trim(),
-      email: (nextProfile?.email || "").trim(),
-      phone: (nextProfile?.phone || "").trim(),
-      avatarUrl: nextProfile?.avatarUrl || ""
-    };
-
-    setAccountProfile(normalized);
-    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(normalized));
-    setUser((prev) => (prev ? {
-      ...prev,
-      displayName: normalized.displayName || prev.displayName,
-      email: normalized.email || prev.email,
-      phone: normalized.phone,
-      avatarUrl: normalized.avatarUrl
-    } : prev));
-    setMe((prev) => (prev ? {
-      ...prev,
-      displayName: normalized.displayName || prev.displayName,
-      email: normalized.email || prev.email,
-      phone: normalized.phone,
-      avatarUrl: normalized.avatarUrl
-    } : prev));
-    setSuccess("Account details updated on this device.");
-    setError("");
-  }, [setError, setSuccess, setUser, setMe]);
 
 
 
 
-  const onChangePassword = useCallback(async ({ currentPassword, newPassword }) => {
-    setError("");
-    setSuccess("");
-    setBusy(true);
 
-    try {
-      await meApi.changePassword(currentPassword, newPassword);
-      setSuccess(currentHasGoogleLogin ? "Password saved for this account." : "Password updated.");
-    } catch (err) {
-      setError(err.message || "Unable to update password.");
-      throw err;
-    } finally {
-      setBusy(false);
-    }
-  }, [currentHasGoogleLogin]);
+
 
 
   return {
