@@ -24,9 +24,50 @@ vi.mock("../../services", () => ({
   }
 }));
 
+function makeControllerArgs(overrides = {}) {
+  return {
+    groups: [],
+    selectedGroupId: "",
+    setGroups: vi.fn(),
+    setSelectedGroupId: vi.fn(),
+    setError: vi.fn(),
+    setSuccess: vi.fn(),
+    setBusy: vi.fn(),
+    currentId: "user-1",
+    currentEmail: "u@example.com",
+    me: undefined,
+    loadSessionData: vi.fn(async () => {}),
+    onOpenGroupPage: vi.fn(),
+    ...overrides
+  };
+}
+
 describe("useDashboardController", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    groupService.create.mockReset();
+    groupService.create.mockImplementation(async (name) => ({ id: "g-new", name }));
+    groupService.createInvite.mockReset();
+    groupService.createInvite.mockImplementation(async () => ({
+      id: "invite-new",
+      token: "t1",
+      sentToEmail: "friend@example.com",
+      sentByUserId: "user-1",
+      expiresAt: "tomorrow"
+    }));
+    groupService.cancelInviteById.mockReset();
+    groupService.cancelInviteById.mockImplementation(async () => {});
+    groupService.cancelInvite.mockReset();
+    groupService.cancelInvite.mockImplementation(async () => {});
+    groupService.listGroupInvites.mockReset();
+    groupService.listGroupInvites.mockImplementation(async () => []);
+    groupService.details.mockReset();
+    groupService.details.mockImplementation(async () => ({ me: { role: "MEMBER" }, group: { createdBy: "someone-else" } }));
+    groupService.acceptPendingInviteById.mockReset();
+    groupService.acceptPendingInviteById.mockImplementation(async () => {});
+    groupService.listPendingInvitesByEmail.mockReset();
+    groupService.listPendingInvitesByEmail.mockImplementation(async () => []);
+    groupService.searchUsers.mockReset();
+    groupService.searchUsers.mockImplementation(async () => []);
     localStorage.setItem("mambasplit_access_token", "test-access-token");
   });
 
@@ -73,6 +114,7 @@ describe("useDashboardController", () => {
   });
 
   it("loads pending invites for current email", async () => {
+    const args = makeControllerArgs({ me: {} });
     groupService.listPendingInvitesByEmail.mockResolvedValueOnce([
       {
         id: "invite-1",
@@ -84,21 +126,7 @@ describe("useDashboardController", () => {
       }
     ]);
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [],
-        selectedGroupId: "",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.pendingInvitesLoading).toBe(false);
@@ -113,6 +141,7 @@ describe("useDashboardController", () => {
   });
 
   it("maps pending invite sender details from inviter fields when available", async () => {
+    const args = makeControllerArgs({ me: {} });
     groupService.listPendingInvitesByEmail.mockResolvedValueOnce([
       {
         id: "invite-1",
@@ -126,21 +155,7 @@ describe("useDashboardController", () => {
       }
     ]);
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [],
-        selectedGroupId: "",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.pendingInvitesLoading).toBe(false);
@@ -176,22 +191,12 @@ describe("useDashboardController", () => {
       }]
     };
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [{ id: "group-1", name: "Trip" }],
-        selectedGroupId: "group-1",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        me,
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({
+      groups: [{ id: "group-1", name: "Trip" }],
+      selectedGroupId: "group-1",
+      me
+    });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.pendingInvitesLoading).toBe(false);
@@ -208,24 +213,49 @@ describe("useDashboardController", () => {
     expect(result.current.state.sentInvites[0].sentToEmail).toBe("friend@example.com");
   });
 
+  it("forces a fresh pending invite fetch when manually refreshed", async () => {
+    const me = {
+      receivedInvites: []
+    };
+    const setSuccess = vi.fn();
+
+    groupService.listPendingInvitesByEmail.mockResolvedValueOnce([
+      {
+        id: "invite-2",
+        groupId: "group-1",
+        groupName: "Trip",
+        sentToEmail: "u@example.com",
+        inviterName: "Julio",
+        inviterEmail: "julio@mambatech.io",
+        expiresAt: "2026-03-03T00:00:00Z",
+        createdAt: "2026-02-27T00:00:00Z"
+      }
+    ]);
+
+    const args = makeControllerArgs({ setSuccess, me });
+    const { result } = renderHook(() => useDashboardController(args));
+
+    await waitFor(() => {
+      expect(result.current.state.pendingInvitesLoading).toBe(false);
+    });
+
+    expect(groupService.listPendingInvitesByEmail).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.actions.onRefreshPendingInvites();
+    });
+
+    expect(groupService.listPendingInvitesByEmail).toHaveBeenCalledWith("u@example.com");
+    expect(result.current.state.pendingInvites).toHaveLength(1);
+    expect(result.current.state.pendingInvites[0].senderName).toBe("Julio");
+    expect(setSuccess).toHaveBeenCalledWith("Pending invites refreshed.");
+  });
+
   it("handles empty pending invite response", async () => {
+    const args = makeControllerArgs();
     groupService.listPendingInvitesByEmail.mockResolvedValueOnce([]);
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [],
-        selectedGroupId: "",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.pendingInvitesLoading).toBe(false);
@@ -236,30 +266,47 @@ describe("useDashboardController", () => {
   });
 
   it("sets pending invite error when invite fetch fails", async () => {
+    const args = makeControllerArgs({ me: {} });
     groupService.listPendingInvitesByEmail.mockRejectedValueOnce(new Error("Invite list failed"));
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [],
-        selectedGroupId: "",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
+    const { result } = renderHook(() => useDashboardController(args));
+
+    await waitFor(() => {
+      expect(result.current.state.pendingInvitesError).toBe("Invite list failed");
+    });
+
+    expect(result.current.state.pendingInvites).toEqual([]);
+    expect(result.current.state.pendingInvitesError).toBe("Invite list failed");
+  });
+
+  it("clears pending invite loading when a later rerender exits before fetching", async () => {
+    let resolveInvites;
+    groupService.listPendingInvitesByEmail.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        resolveInvites = resolve;
       })
     );
+
+    const { result, rerender } = renderHook(
+      ({ args }) => useDashboardController(args),
+      {
+        initialProps: {
+          args: makeControllerArgs({ me: {} })
+        }
+      }
+    );
+
+    await waitFor(() => {
+      expect(result.current.state.pendingInvitesLoading).toBe(true);
+    });
+
+    rerender({ args: makeControllerArgs({ me: null }) });
 
     await waitFor(() => {
       expect(result.current.state.pendingInvitesLoading).toBe(false);
     });
 
-    expect(result.current.state.pendingInvites).toEqual([]);
-    expect(result.current.state.pendingInvitesError).toBe("Invite list failed");
+    resolveInvites?.([]);
   });
 
   it("maps sent invites with sentByUserId and sentToEmail, filtering other senders", async () => {
@@ -296,24 +343,14 @@ describe("useDashboardController", () => {
       ];
     });
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [
-          { id: "group-1", name: "Trip" },
-          { id: "group-2", name: "Dinner" }
-        ],
-        selectedGroupId: "group-1",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({
+      groups: [
+        { id: "group-1", name: "Trip" },
+        { id: "group-2", name: "Dinner" }
+      ],
+      selectedGroupId: "group-1"
+    });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.sentInvites).toHaveLength(2);
@@ -324,6 +361,7 @@ describe("useDashboardController", () => {
       "legacy@example.com"
     ]);
     expect(result.current.state.sentInvites.every((invite) => invite.sentByUserId !== "user-2")).toBe(true);
+    expect(result.current.state.sentInvites.find((invite) => invite.id === "legacy-1")?.sentByUserId).toBe("user-1");
     expect(groupService.listGroupInvites).toHaveBeenCalledTimes(2);
   });
 
@@ -339,21 +377,11 @@ describe("useDashboardController", () => {
       }
     ]);
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [{ id: "group-1", name: "Trip" }],
-        selectedGroupId: "group-1",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({
+      groups: [{ id: "group-1", name: "Trip" }],
+      selectedGroupId: "group-1"
+    });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.sentInvites).toHaveLength(1);
@@ -374,21 +402,12 @@ describe("useDashboardController", () => {
     });
     const setSuccess = vi.fn();
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [{ id: "group-1", name: "Trip" }],
-        selectedGroupId: "group-1",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess,
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({
+      groups: [{ id: "group-1", name: "Trip" }],
+      selectedGroupId: "group-1",
+      setSuccess
+    });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.inviteCandidatesLoading).toBe(false);
@@ -429,21 +448,12 @@ describe("useDashboardController", () => {
     });
     const setSuccess = vi.fn();
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [{ id: "group-1", name: "Trip" }],
-        selectedGroupId: "group-1",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess,
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({
+      groups: [{ id: "group-1", name: "Trip" }],
+      selectedGroupId: "group-1",
+      setSuccess
+    });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.sentInvites).toHaveLength(1);
@@ -476,21 +486,13 @@ describe("useDashboardController", () => {
 
     const setError = vi.fn();
     const setSuccess = vi.fn();
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [{ id: "group-1", name: "Trip" }],
-        selectedGroupId: "group-1",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError,
-        setSuccess,
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({
+      groups: [{ id: "group-1", name: "Trip" }],
+      selectedGroupId: "group-1",
+      setError,
+      setSuccess
+    });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.sentInvites).toHaveLength(1);
@@ -512,21 +514,8 @@ describe("useDashboardController", () => {
     const setError = vi.fn();
     const setSuccess = vi.fn();
     const loadSessionData = vi.fn(async () => {});
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [],
-        selectedGroupId: "",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError,
-        setSuccess,
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData,
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({ setError, setSuccess, loadSessionData });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.pendingInvitesLoading).toBe(false);
@@ -544,21 +533,8 @@ describe("useDashboardController", () => {
 
   it("blocks delete when invite identifier is unavailable", async () => {
     const setError = vi.fn();
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [],
-        selectedGroupId: "",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError,
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({ setError });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.pendingInvitesLoading).toBe(false);
@@ -578,21 +554,8 @@ describe("useDashboardController", () => {
 
   it("uses token cancel fallback when invite id is not a uuid", async () => {
     const setSuccess = vi.fn();
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [],
-        selectedGroupId: "",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess,
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({ setSuccess });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.pendingInvitesLoading).toBe(false);
@@ -614,21 +577,8 @@ describe("useDashboardController", () => {
 
   it("blocks delete when invite sender is not current member", async () => {
     const setError = vi.fn();
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [],
-        selectedGroupId: "",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError,
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({ setError });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.pendingInvitesLoading).toBe(false);
@@ -650,21 +600,8 @@ describe("useDashboardController", () => {
 
   it("blocks delete when invite sender is missing (legacy safety)", async () => {
     const setError = vi.fn();
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [],
-        selectedGroupId: "",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError,
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({ setError });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.pendingInvitesLoading).toBe(false);
@@ -698,21 +635,11 @@ describe("useDashboardController", () => {
       }
     ]);
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [{ id: "group-1", name: "Trip" }],
-        selectedGroupId: "group-1",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError: vi.fn(),
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({
+      groups: [{ id: "group-1", name: "Trip" }],
+      selectedGroupId: "group-1"
+    });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.inviteCandidatesLoading).toBe(false);
@@ -733,21 +660,12 @@ describe("useDashboardController", () => {
     groupService.createInvite.mockRejectedValueOnce({ status: 409, message: "Request failed (409)." });
     const setError = vi.fn();
 
-    const { result } = renderHook(() =>
-      useDashboardController({
-        groups: [{ id: "group-1", name: "Trip" }],
-        selectedGroupId: "group-1",
-        setGroups: vi.fn(),
-        setSelectedGroupId: vi.fn(),
-        setError,
-        setSuccess: vi.fn(),
-        setBusy: vi.fn(),
-        currentId: "user-1",
-        currentEmail: "u@example.com",
-        loadSessionData: vi.fn(async () => {}),
-        onOpenGroupPage: vi.fn()
-      })
-    );
+    const args = makeControllerArgs({
+      groups: [{ id: "group-1", name: "Trip" }],
+      selectedGroupId: "group-1",
+      setError
+    });
+    const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
       expect(result.current.state.inviteCandidatesLoading).toBe(false);

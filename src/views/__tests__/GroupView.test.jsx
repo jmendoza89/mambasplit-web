@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import { AlertContext } from "../../contexts/AlertContext";
 import { AuthContext } from "../../contexts/AuthContext";
 import GroupView from "../GroupView";
@@ -46,6 +46,10 @@ function renderView(overrideProps = {}) {
     onDeleteExpense: vi.fn(),
     onRefreshGroupDetail: vi.fn(),
     onDeleteGroup: vi.fn(),
+    isLeaveGroupModalOpen: false,
+    onOpenLeaveGroupModal: vi.fn(),
+    onCancelLeaveGroup: vi.fn(),
+    onConfirmLeaveGroup: vi.fn(),
     ...overrideProps
   };
 
@@ -71,11 +75,35 @@ function renderView(overrideProps = {}) {
 }
 
 describe("GroupView", () => {
+  afterEach(() => cleanup());
   it("uses the same mapped balance as the dashboard card for the group hero", () => {
     renderView();
 
     expect(screen.getByText("You are owed")).toBeInTheDocument();
     expect(screen.getByText("$7.50")).toBeInTheDocument();
     expect(screen.queryByText("You are settled up")).not.toBeInTheDocument();
+  });
+
+  it("renders Leave Group button disabled for the group owner", () => {
+    renderView({ isGroupOwner: true, effectiveMyRole: "OWNER" });
+    // Leave Group button has text content "Leave Group"
+    // The title provides tooltip but accessible name is the text
+    const leaveBtn = screen.getByRole("button", { name: "Leave Group" });
+    expect(leaveBtn).toBeDisabled();
+  });
+
+  it("renders Leave Group button enabled for a non-owner member", () => {
+    renderView({ isGroupOwner: false, effectiveMyRole: "MEMBER" });
+    const leaveBtn = screen.getByRole("button", { name: "Leave Group" });
+    expect(leaveBtn).not.toBeDisabled();
+  });
+
+  it("calls onOpenLeaveGroupModal when Leave Group is clicked by a non-owner", async () => {
+    const userEvent = (await import("@testing-library/user-event")).default;
+    const user = userEvent.setup();
+    const onOpenLeaveGroupModal = vi.fn();
+    renderView({ isGroupOwner: false, effectiveMyRole: "MEMBER", onOpenLeaveGroupModal });
+    await user.click(screen.getByRole("button", { name: "Leave Group" }));
+    expect(onOpenLeaveGroupModal).toHaveBeenCalledOnce();
   });
 });

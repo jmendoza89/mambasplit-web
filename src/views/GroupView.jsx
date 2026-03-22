@@ -7,6 +7,7 @@ import { resolveGroupBalanceCents } from "../utils/groupBalance";
 import ExpenseCardItem from "./components/ExpenseCardItem";
 import GroupDetailsHero from "./components/GroupDetailsHero";
 import MemberCardItem from "./components/MemberCardItem";
+import LeaveGroupModal from "./LeaveGroupModal";
 import SettleUpModal from "./SettleUpModal";
 
 export default function GroupView({
@@ -38,7 +39,11 @@ export default function GroupView({
   isSettleUpModalOpen,
   onDeleteExpense,
   onRefreshGroupDetail,
-  onDeleteGroup
+  onDeleteGroup,
+  isLeaveGroupModalOpen,
+  onOpenLeaveGroupModal,
+  onCancelLeaveGroup,
+  onConfirmLeaveGroup
 }) {
   const { currentId, currentName, onLogout } = useAuth();
   const { busy } = useAlerts();
@@ -91,6 +96,7 @@ export default function GroupView({
 
     return map;
   }, [displayMembers, unsettledExpenses]);
+  const currentUserUnsettledNetCents = unsettledNetByUserId.get(currentId) || 0;
   const balanceDiagnostics = useMemo(() => {
     const rows = (displayMembers || []).map((member, index) => {
       const memberId = member?.id || `member-${index}`;
@@ -189,6 +195,15 @@ export default function GroupView({
               title={isGroupOwner ? "Delete this group" : "Only the group owner can delete this group"}
             >
               Delete Group
+            </button>
+            <button
+              className="btn-danger"
+              type="button"
+              onClick={onOpenLeaveGroupModal}
+              disabled={busy || groupLoading || !selectedGroupId || isGroupOwner}
+              title={isGroupOwner ? "Group owners cannot leave their group" : "Leave this group"}
+            >
+              Leave Group
             </button>
             <button className="btn-ghost" type="button" onClick={onLogout} disabled={busy}>
               Logout
@@ -417,6 +432,15 @@ export default function GroupView({
         settlementSuggestions={settlementSuggestions}
         groupName={detailsGroupInfo?.name || displayedGroup?.name || "Group"}
         onSaveSettlement={onCreateSettlement}
+      />
+
+      <LeaveGroupModal
+        isOpen={Boolean(isLeaveGroupModalOpen)}
+        onClose={onCancelLeaveGroup}
+        onConfirm={onConfirmLeaveGroup}
+        groupName={detailsGroupInfo?.name || displayedGroup?.name || "Group"}
+        currentUserUnsettledNetCents={currentUserUnsettledNetCents}
+        busy={busy}
       />
     </section>
   );

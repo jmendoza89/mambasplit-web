@@ -1,6 +1,8 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppController } from "../useAppController";
+
+let capturedSetBusy = null;
 
 vi.mock("../../api", () => ({
   getStoredUser: vi.fn(() => null)
@@ -21,30 +23,33 @@ vi.mock("../useAuthController", () => ({
 }));
 
 vi.mock("../useDashboardController", () => ({
-  useDashboardController: vi.fn(() => ({
-    state: {
-      newGroupName: "",
-      inviteEmail: "",
-      inviteResult: null,
-      sentInvites: [],
-      pendingInvites: [],
-      pendingInvitesLoading: false,
-      pendingInvitesError: "",
-      inviteCandidates: [],
-      inviteCandidatesLoading: false,
-      groupOwnershipById: {}
-    },
-    actions: {
-      onResetDashboardState: vi.fn(),
-      setNewGroupName: vi.fn(),
-      setInviteEmail: vi.fn(),
-      onCreateGroup: vi.fn(),
-      onCreateInvite: vi.fn(),
-      onAcceptPendingInvite: vi.fn(),
-      onDeleteInvite: vi.fn(),
-      onRefreshPendingInvites: vi.fn()
-    }
-  }))
+  useDashboardController: vi.fn((options) => {
+    capturedSetBusy = options.setBusy;
+    return {
+      state: {
+        newGroupName: "",
+        inviteEmail: "",
+        inviteResult: null,
+        sentInvites: [],
+        pendingInvites: [],
+        pendingInvitesLoading: false,
+        pendingInvitesError: "",
+        inviteCandidates: [],
+        inviteCandidatesLoading: false,
+        groupOwnershipById: {}
+      },
+      actions: {
+        onResetDashboardState: vi.fn(),
+        setNewGroupName: vi.fn(),
+        setInviteEmail: vi.fn(),
+        onCreateGroup: vi.fn(),
+        onCreateInvite: vi.fn(),
+        onAcceptPendingInvite: vi.fn(),
+        onDeleteInvite: vi.fn(),
+        onRefreshPendingInvites: vi.fn()
+      }
+    };
+  })
 }));
 
 vi.mock("../useGroupController", () => ({
@@ -100,8 +105,14 @@ vi.mock("../useGroupController", () => ({
 
 describe("useAppController password reset flow", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    capturedSetBusy = null;
     localStorage.clear();
     window.history.replaceState({}, "", "/");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("supports mock email link -> reset screen -> confirm password", async () => {
@@ -137,5 +148,65 @@ describe("useAppController password reset flow", () => {
 
     expect(result.current.state.passwordResetTestValue).toBe("new-password-123");
     expect(result.current.state.resetTokenStatus).toBe("used");
+  });
+
+  it("keeps busy true until overlapping operations finish", () => {
+    const { result } = renderHook(() => useAppController());
+
+    expect(capturedSetBusy).toBeTypeOf("function");
+    expect(result.current.state.busy).toBe(false);
+
+    act(() => {
+      capturedSetBusy(true);
+      capturedSetBusy(true);
+    });
+
+    expect(result.current.state.busy).toBe(true);
+
+    act(() => {
+      capturedSetBusy(false);
+    });
+
+    expect(result.current.state.busy).toBe(true);
+
+    act(() => {
+      capturedSetBusy(false);
+    });
+
+    expect(result.current.state.busy).toBe(false);
+  });
+
+  it("auto-clears success alerts after a short delay", () => {
+    const { result } = renderHook(() => useAppController());
+
+    act(() => {
+      result.current.actions.onStartPasswordReset("user@example.com");
+    });
+
+    expect(result.current.state.success).toBe("");
+
+    act(() => {
+      result.current.actions.onOpenPasswordResetLink("https://example.com/?resetToken=");
+    });
+
+    expect(result.current.state.success).toBe("");
+    expect(result.current.state.error).toBe("Reset link is invalid.");
+
+    act(() => {
+      result.current.actions.onSaveAccountProfile({
+        displayName: "User",
+        email: "user@example.com",
+        phone: "",
+        avatarUrl: ""
+      });
+    });
+
+    expect(result.current.state.success).toBe("Account details updated on this device.");
+
+    act(() => {
+      vi.advanceTimersByTime(4500);
+    });
+
+    expect(result.current.state.success).toBe("");
   });
 });

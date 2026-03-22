@@ -201,6 +201,10 @@ export default function App() {
             onDeleteExpense={actions.onDeleteExpense}
             onRefreshGroupDetail={actions.onRefreshGroupDetail}
             onDeleteGroup={actions.onDeleteGroup}
+            isLeaveGroupModalOpen={state.isLeaveGroupModalOpen}
+            onOpenLeaveGroupModal={actions.onOpenLeaveGroupModal}
+            onCancelLeaveGroup={actions.onCancelLeaveGroup}
+            onConfirmLeaveGroup={actions.onConfirmLeaveGroup}
           />
         )}
       </motion.main>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getStoredUser, meApi } from "../api";
 import { fetchSessionData } from "../services";
 import {
@@ -12,6 +12,7 @@ import { useDashboardController } from "./useDashboardController";
 import { useGroupController } from "./useGroupController";
 
 const PROFILE_STORAGE_KEY = "mambasplit_account_profile";
+const SUCCESS_ALERT_TIMEOUT_MS = 4500;
 
 function getStoredProfile() {
   const fallback = { displayName: "", email: "", phone: "", avatarUrl: "" };
@@ -30,7 +31,61 @@ export function useAppController() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusyState] = useState(false);
+  const busyCountRef = useRef(0);
+  const busyTimeoutRef = useRef(null);
+  const successTimeoutRef = useRef(null);
+
+  const clearBusyWatchdog = useCallback(() => {
+    if (busyTimeoutRef.current) {
+      clearTimeout(busyTimeoutRef.current);
+      busyTimeoutRef.current = null;
+    }
+  }, []);
+
+  const scheduleBusyWatchdog = useCallback(() => {
+    clearBusyWatchdog();
+    // Safety watchdog: clear busy if it remains set for too long.
+    busyTimeoutRef.current = setTimeout(() => {
+      console.warn("Clearing stuck busy state after timeout");
+      busyCountRef.current = 0;
+      setBusyState(false);
+      busyTimeoutRef.current = null;
+    }, 30000);
+  }, [clearBusyWatchdog]);
+
+  // Track active async work instead of toggling a single boolean so
+  // overlapping actions cannot leave the dashboard stuck as busy.
+  const setBusy = useCallback((value) => {
+    if (value) {
+      busyCountRef.current += 1;
+      setBusyState(true);
+      scheduleBusyWatchdog();
+      return;
+    }
+
+    busyCountRef.current = Math.max(0, busyCountRef.current - 1);
+    if (busyCountRef.current === 0) {
+      clearBusyWatchdog();
+      setBusyState(false);
+    } else {
+      setBusyState(true);
+      scheduleBusyWatchdog();
+    }
+  }, [clearBusyWatchdog, scheduleBusyWatchdog]);
+
+  const resetBusyState = useCallback(() => {
+    busyCountRef.current = 0;
+    clearBusyWatchdog();
+    setBusyState(false);
+  }, [clearBusyWatchdog]);
+
+  const clearSuccessWatchdog = useCallback(() => {
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = null;
+    }
+  }, []);
 
   const [user, setUser] = useState(getStoredUser());
   const [me, setMe] = useState(null);
@@ -134,6 +189,26 @@ export function useAppController() {
       return (groupData[0] && groupData[0].id) || "";
     });
   }, []);
+
+  // Cleanup watchdog on unmount
+  useEffect(() => {
+    return () => {
+      resetBusyState();
+      clearSuccessWatchdog();
+    };
+  }, [clearSuccessWatchdog, resetBusyState]);
+
+  useEffect(() => {
+    clearSuccessWatchdog();
+    if (!success) return undefined;
+
+    successTimeoutRef.current = setTimeout(() => {
+      setSuccess("");
+      successTimeoutRef.current = null;
+    }, SUCCESS_ALERT_TIMEOUT_MS);
+
+    return clearSuccessWatchdog;
+  }, [clearSuccessWatchdog, success]);
 
   const groupController = useGroupController({
     activeView,
@@ -250,7 +325,7 @@ export function useAppController() {
     } finally {
       setBusy(false);
     }
-  }, [email]);
+  }, [email, setBusy]);
 
   const onOpenPasswordResetLink = useCallback((link) => {
     setError("");
@@ -321,7 +396,7 @@ export function useAppController() {
     } finally {
       setBusy(false);
     }
-  }, [password, resetConfirmPassword, resetToken]);
+  }, [password, resetConfirmPassword, resetToken, setBusy]);
 
   // Restore onSaveAccountProfile and onChangePassword definitions
   const onSaveAccountProfile = useCallback((nextProfile) => {
@@ -366,7 +441,7 @@ export function useAppController() {
     } finally {
       setBusy(false);
     }
-  }, [currentHasGoogleLogin]);
+  }, [currentHasGoogleLogin, setBusy]);
 
 
 
@@ -414,6 +489,7 @@ export function useAppController() {
       settlementSuggestions: groupController.state.settlementSuggestions,
       isExpenseModalOpen: groupController.state.isExpenseModalOpen,
       isSettleUpModalOpen: groupController.state.isSettleUpModalOpen,
+      isLeaveGroupModalOpen: groupController.state.isLeaveGroupModalOpen,
       recentSettlementId: groupController.state.recentSettlementId,
       expenseDescription: groupController.state.expenseDescription,
       expenseAmount: groupController.state.expenseAmount,
@@ -485,6 +561,9 @@ export function useAppController() {
       onCreateSettlement: groupController.actions.onCreateSettlement,
       onDeleteExpense: groupController.actions.onDeleteExpense,
       onDeleteGroup: groupController.actions.onDeleteGroup,
+      onOpenLeaveGroupModal: groupController.actions.onOpenLeaveGroupModal,
+      onCancelLeaveGroup: groupController.actions.onCancelLeaveGroup,
+      onConfirmLeaveGroup: groupController.actions.onConfirmLeaveGroup,
       onRefreshGroupDetail: groupController.actions.onRefreshGroupDetail
     }
   };

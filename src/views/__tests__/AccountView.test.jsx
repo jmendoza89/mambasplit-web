@@ -21,10 +21,9 @@ describe("AccountView", () => {
       />
     );
 
-    expect(screen.getByText("Julio Mendoza")).toBeInTheDocument();
-    expect(screen.queryByDisplayValue("Julio Mendoza")).not.toBeInTheDocument();
-
     const nameRow = screen.getByText("Your name").closest(".account-info-row");
+    expect(within(nameRow).getByText("Julio Mendoza")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Julio Mendoza")).not.toBeInTheDocument();
     fireEvent.click(within(nameRow).getByRole("button", { name: "Edit" }));
 
     const nameInput = screen.getByDisplayValue("Julio Mendoza");

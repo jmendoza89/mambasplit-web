@@ -48,7 +48,7 @@ export default function DashboardHero({
             </button>
             <button
               type="button"
-              className="btn-inline"
+              className="btn-inline dashboard-hero-refresh"
               onClick={onRefreshPendingInvites}
               disabled={busy || pendingInvitesLoading}
             >

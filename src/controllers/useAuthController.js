@@ -182,7 +182,7 @@ export function useAuthController({
           size: "large",
           shape: "pill",
           text: authMode === "login" ? "signin_with" : "signup_with",
-          width: 320
+          width: 220
         });
         setGoogleButtonStatus(container.childElementCount > 0 ? "ready" : "error");
       } catch (err) {

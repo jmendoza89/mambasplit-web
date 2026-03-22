@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAccessToken } from "../api";
 import { isValidGroupName } from "../models";
 import { groupService } from "../services";
@@ -191,6 +191,7 @@ export function useDashboardController({
   const [inviteCandidates, setInviteCandidates] = useState([]);
   const [inviteCandidatesLoading, setInviteCandidatesLoading] = useState(false);
   const [groupOwnershipById, setGroupOwnershipById] = useState({});
+  const pendingInvitesRequestIdRef = useRef(0);
   const groupsSignature = groups.map((group) => `${group?.id || ""}:${group?.name || ""}`).join("|");
   // Keep a stable group reference for effects that only care about id/name changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -263,30 +264,51 @@ export function useDashboardController({
     };
   }, [currentId, groupOwnershipById, groupsForEffects, groupsSignature, setGroups]);
 
-  const loadPendingInvites = useCallback(async () => {
-    if (!getAccessToken() || !currentEmail || currentEmail === "-") {
-      setPendingInvites([]);
-      setPendingInvitesError("");
-      return;
-    }
+  const loadPendingInvites = useCallback(async (options = {}) => {
+    const force = options.force === true;
+    const announceRefresh = options.announceRefresh === true;
+    const requestId = pendingInvitesRequestIdRef.current + 1;
+    pendingInvitesRequestIdRef.current = requestId;
 
+    // Don't fetch until the session (me) has been loaded. The effect will
+    // re-run once me is set, at which point it can use me.receivedInvites
+    // directly (fast path) or fall through to the API call — but only once.
     setPendingInvitesLoading(true);
     setPendingInvitesError("");
     try {
-      const invites = Array.isArray(me?.receivedInvites)
+      if (!getAccessToken() || !currentEmail || currentEmail === "-") {
+        setPendingInvites([]);
+        setPendingInvitesError("");
+        return;
+      }
+
+      if (!me) {
+        setPendingInvites([]);
+        return;
+      }
+
+      const invites = !force && Array.isArray(me?.receivedInvites)
         ? me.receivedInvites
         : await groupService.listPendingInvitesByEmail(currentEmail);
       const normalized = Array.isArray(invites)
         ? invites.map(normalizePendingInvite)
         : [];
       setPendingInvites(normalized);
+      if (force && announceRefresh) {
+        setSuccess(normalized.length ? "Pending invites refreshed." : "Pending invites refreshed. You're all caught up.");
+      }
     } catch (err) {
       setPendingInvites([]);
       setPendingInvitesError(err.message || "Could not load pending invites.");
+      if (force && announceRefresh) {
+        setError(err.message || "Could not load pending invites.");
+      }
     } finally {
-      setPendingInvitesLoading(false);
+      if (pendingInvitesRequestIdRef.current === requestId) {
+        setPendingInvitesLoading(false);
+      }
     }
-  }, [currentEmail, me]);
+  }, [currentEmail, me, setError, setSuccess]);
 
   useEffect(() => {
     loadPendingInvites();
@@ -357,7 +379,8 @@ export function useDashboardController({
             .map((invite) => normalizeSentInvite(invite, {
               currentId,
               fallbackGroupId: invite?.groupId || "",
-              fallbackGroupName: invite?.groupName || groupsForEffects.find((group) => group.id === invite?.groupId)?.name || "Group"
+              fallbackGroupName: invite?.groupName || groupsForEffects.find((group) => group.id === invite?.groupId)?.name || "Group",
+              fallbackSentByUserId: currentId
             }))
             .filter(Boolean)
         ];
@@ -371,7 +394,8 @@ export function useDashboardController({
                 .map((invite) => normalizeSentInvite(invite, {
                   currentId,
                   fallbackGroupId: group.id,
-                  fallbackGroupName: group.name || invite?.groupName || "Group"
+                  fallbackGroupName: group.name || invite?.groupName || "Group",
+                  fallbackSentByUserId: currentId
                 }))
                 .filter(Boolean);
             } catch {
@@ -605,7 +629,7 @@ export function useDashboardController({
       onAcceptPendingInvite,
       onDeleteInvite,
       onRefreshInvite,
-      onRefreshPendingInvites: loadPendingInvites,
+      onRefreshPendingInvites: () => loadPendingInvites({ force: true, announceRefresh: true }),
       onOpenGroupPage,
       onResetDashboardState
     }
