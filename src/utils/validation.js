@@ -175,6 +175,10 @@ export function validateUuid(id) {
   return { valid: true, error: null };
 }
 
+export function isUuid(id) {
+  return validateUuid(id).valid;
+}
+
 /**
  * Batch validate multiple fields
  * Returns first error found or null if all valid

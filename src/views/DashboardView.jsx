@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
 import { isGroupOwner as checkGroupOwnership } from "../utils/groupOwnership";
-import { isUuid } from "../../utils/validation";
+import { isUuid } from "../utils/validation";
 import DashboardEmptyState from "./components/DashboardEmptyState";
 import DashboardGroupCardItem from "./components/DashboardGroupCardItem";
 import DashboardHero from "./components/DashboardHero";
