@@ -258,7 +258,7 @@ export function useDashboardController({
     return () => {
       cancelled = true;
     };
-  }, [currentId, groupOwnershipById, groupsSignature]);
+  }, [currentId, groupOwnershipById, groupsSignature, groups, setGroups]);
 
   const loadPendingInvites = useCallback(async () => {
     if (!getAccessToken() || !currentEmail || currentEmail === "-") {
@@ -387,7 +387,7 @@ export function useDashboardController({
     return () => {
       cancelled = true;
     };
-  }, [currentId, groupsSignature, me]);
+  }, [currentId, groupsSignature, me, groups]);
 
   async function onCreateGroup(e) {
     e.preventDefault();

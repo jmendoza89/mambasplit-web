@@ -62,8 +62,14 @@ export function useAppController() {
     () => accountProfile.email || (me && me.email) || (user && user.email) || "-",
     [accountProfile.email, me, user]
   );
+
   const currentPhone = useMemo(() => accountProfile.phone || "", [accountProfile.phone]);
   const currentId = useMemo(() => (me && me.id) || (user && user.id) || "-", [me, user]);
+  const currentAvatarUrl = useMemo(() => accountProfile.avatarUrl || "", [accountProfile.avatarUrl]);
+  const currentHasGoogleLogin = useMemo(
+    () => Boolean((me && me.hasGoogleLogin) || (user && user.hasGoogleLogin)),
+    [me, user]
+  );
 
 
 
@@ -276,6 +282,7 @@ export function useAppController() {
     }
   }, [setAuthMode]);
 
+
   const onSubmitPasswordReset = useCallback(async (e) => {
     e.preventDefault();
     setError("");
@@ -315,6 +322,51 @@ export function useAppController() {
       setBusy(false);
     }
   }, [password, resetConfirmPassword, resetToken]);
+
+  // Restore onSaveAccountProfile and onChangePassword definitions
+  const onSaveAccountProfile = useCallback((nextProfile) => {
+    const normalized = {
+      displayName: (nextProfile?.displayName || "").trim(),
+      email: (nextProfile?.email || "").trim(),
+      phone: (nextProfile?.phone || "").trim(),
+      avatarUrl: nextProfile?.avatarUrl || ""
+    };
+
+    setAccountProfile(normalized);
+    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(normalized));
+    setUser((prev) => (prev ? {
+      ...prev,
+      displayName: normalized.displayName || prev.displayName,
+      email: normalized.email || prev.email,
+      phone: normalized.phone,
+      avatarUrl: normalized.avatarUrl
+    } : prev));
+    setMe((prev) => (prev ? {
+      ...prev,
+      displayName: normalized.displayName || prev.displayName,
+      email: normalized.email || prev.email,
+      phone: normalized.phone,
+      avatarUrl: normalized.avatarUrl
+    } : prev));
+    setSuccess("Account details updated on this device.");
+    setError("");
+  }, [setError, setSuccess, setUser, setMe]);
+
+  const onChangePassword = useCallback(async ({ currentPassword, newPassword }) => {
+    setError("");
+    setSuccess("");
+    setBusy(true);
+
+    try {
+      await meApi.changePassword(currentPassword, newPassword);
+      setSuccess(currentHasGoogleLogin ? "Password saved for this account." : "Password updated.");
+    } catch (err) {
+      setError(err.message || "Unable to update password.");
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  }, [currentHasGoogleLogin]);
 
 
 

@@ -6,7 +6,6 @@ export default function DashboardPendingInviteCard({
   groupName,
   senderName,
   senderEmail,
-  createdAt,
   expiresAt,
   actionLabel,
   onAction,

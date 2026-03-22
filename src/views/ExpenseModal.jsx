@@ -28,7 +28,7 @@ export default function ExpenseModal({
   const amountValue = Number(expenseAmount) || 0;
   const safeParticipantCount = Math.max(1, participantCount || 1);
   const splitPerPerson = amountValue > 0 ? amountValue / safeParticipantCount : 0;
-  const payerOptions = members || [];
+  const payerOptions = useMemo(() => members || [], [members]);
   const payerName = useMemo(
     () => payerOptions.find((member) => member.id === expensePayerUserId)?.name || "Select member",
     [payerOptions, expensePayerUserId]

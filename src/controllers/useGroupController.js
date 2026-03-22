@@ -144,13 +144,13 @@ export function useGroupController({
     } finally {
       setGroupLoading(false);
     }
-  }, [groupDetailStatusById, setGroupError, setGroupDetail, setGroupDetailStatusById]);
+  }, [groupDetailStatusById, setGroupError, setGroupDetail, setGroupDetailStatusById, setGroups]);
 
   useEffect(() => {
     if (activeView !== "group" || !selectedGroupId) return;
     if (groupDetail && (groupDetail.group?.id === selectedGroupId || groupDetail.id === selectedGroupId)) return;
     loadGroupDetail(selectedGroupId);
-  }, [activeView, selectedGroupId, groupDetail, loadGroupDetail]);
+  }, [activeView, selectedGroupId, groupDetail, loadGroupDetail, groups]);
 
   useEffect(() => {
     if (!isExpenseModalOpen) return;
