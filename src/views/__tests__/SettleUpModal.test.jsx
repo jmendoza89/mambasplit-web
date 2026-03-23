@@ -19,7 +19,7 @@ const expenses = [
 describe("SettleUpModal", () => {
   afterEach(() => cleanup());
 
-  it("prefills amount from total recent expenses", async () => {
+  it("prefills amount from current-user applicable values", async () => {
     render(
       <SettleUpModal
         isOpen
@@ -39,6 +39,28 @@ describe("SettleUpModal", () => {
     );
 
     expect(screen.getAllByLabelText("Settlement amount")[0]).toHaveValue("12.00");
+  });
+
+  it("prefills amount from suggestion when current user is the payer", async () => {
+    render(
+      <SettleUpModal
+        isOpen
+        onClose={vi.fn()}
+        currentUserId={members[0].id}
+        currentUserName="Alex"
+        members={members}
+        expenses={expenses}
+        settlementSuggestions={[{
+          fromUserId: members[0].id,
+          toUserId: members[1].id,
+          amountCents: 6400
+        }]}
+        groupName="Trip"
+        onSaveSettlement={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByLabelText("Settlement amount")[0]).toHaveValue("64.00");
   });
 
   it("blocks save when settlement amount is not positive", async () => {
@@ -96,5 +118,29 @@ describe("SettleUpModal", () => {
     });
     expect(onSaveSettlement.mock.calls[0][0].settledAt).toMatch(/T00:00:00[+-]\d{2}:\d{2}$/);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks save when there are no unsettled expenses", async () => {
+    const onSaveSettlement = vi.fn();
+
+    render(
+      <SettleUpModal
+        isOpen
+        onClose={vi.fn()}
+        currentUserId={members[0].id}
+        currentUserName="Alex"
+        members={members}
+        expenses={[]}
+        settlementSuggestions={[]}
+        groupName="Trip"
+        onSaveSettlement={onSaveSettlement}
+      />
+    );
+
+    fireEvent.change(screen.getAllByLabelText("Settlement amount")[0], { target: { value: "1.00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("No unsettled expenses are available to settle.")).toBeInTheDocument();
+    expect(onSaveSettlement).not.toHaveBeenCalled();
   });
 });

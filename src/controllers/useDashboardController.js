@@ -1,8 +1,171 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAccessToken } from "../api";
 import { isValidGroupName } from "../models";
 import { groupService } from "../services";
 import { extractOwnershipFromDetail } from "../utils/groupOwnership";
+import { resolveGroupBalanceCents } from "../utils/groupBalance";
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getInviteRecipientEmail(invite) {
+  return String(invite?.sentToEmail ?? "").trim();
+}
+
+function getInviteSenderName(invite) {
+  const value = invite?.senderName
+    ?? invite?.sentByName
+    ?? invite?.sentByDisplayName
+    ?? invite?.inviterName
+    ?? invite?.fromName
+    ?? invite?.sender?.displayName
+    ?? invite?.sender?.name
+    ?? invite?.sentBy?.displayName
+    ?? invite?.sentBy?.name
+    ?? invite?.inviter?.displayName
+    ?? invite?.inviter?.name
+    ?? "";
+  return String(value || "").trim();
+}
+
+function getInviteSenderEmail(invite) {
+  const value = invite?.senderEmail
+    ?? invite?.sentByEmail
+    ?? invite?.inviterEmail
+    ?? invite?.fromEmail
+    ?? invite?.sender?.email
+    ?? invite?.sentBy?.email
+    ?? invite?.inviter?.email
+    ?? "";
+  return String(value || "").trim();
+}
+
+function inviteTimeValue(value) {
+  const timestamp = new Date(value || 0).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function sortSentInvites(invites) {
+  return [...invites].sort((a, b) => inviteTimeValue(b.createdAt) - inviteTimeValue(a.createdAt));
+}
+
+function normalizePendingInvite(invite) {
+  const sentToEmail = getInviteRecipientEmail(invite);
+  const senderName = getInviteSenderName(invite);
+  const senderEmail = getInviteSenderEmail(invite);
+
+  return {
+    ...invite,
+    senderName,
+    senderEmail,
+    sentToEmail
+  };
+}
+
+function isSameSentInvite(left, right) {
+  if (!left || !right) return false;
+  if (left.id && right.id && left.id === right.id) return true;
+  if (left.groupId && right.groupId && left.token && right.token) {
+    return left.groupId === right.groupId && left.token === right.token;
+  }
+  if (left.groupId && right.groupId) {
+    return left.groupId === right.groupId
+      && normalizeEmail(getInviteRecipientEmail(left)) === normalizeEmail(getInviteRecipientEmail(right));
+  }
+  return false;
+}
+
+function normalizeSentInvite(invite, {
+  currentId = null,
+  fallbackGroupId = "",
+  fallbackGroupName = "Group",
+  fallbackSentToEmail = "",
+  fallbackCreatedAt = null,
+  fallbackToken = null,
+  fallbackSentByUserId = null
+} = {}) {
+  const sentByUserId = invite?.sentByUserId ?? fallbackSentByUserId ?? null;
+  if (sentByUserId && currentId && currentId !== "-" && sentByUserId !== currentId) {
+    return null;
+  }
+
+  const sentToEmail = getInviteRecipientEmail(invite) || fallbackSentToEmail;
+  const groupId = invite?.groupId || fallbackGroupId;
+  const token = invite?.token || fallbackToken || null;
+  const id = invite?.id || token || `${groupId}:${normalizeEmail(sentToEmail)}`;
+  const sentByDisplayName = getInviteSenderName(invite);
+  const sentByEmail = getInviteSenderEmail(invite);
+
+  return {
+    id,
+    groupId,
+    groupName: invite?.groupName || fallbackGroupName,
+    sentByUserId,
+    sentByDisplayName,
+    sentByEmail,
+    senderName: sentByDisplayName,
+    senderEmail: sentByEmail,
+    sentToEmail,
+    expiresAt: invite?.expiresAt || null,
+    createdAt: invite?.createdAt || fallbackCreatedAt,
+    token
+  };
+}
+
+function upsertSentInvite(existingInvites, nextInvite) {
+  const index = existingInvites.findIndex((invite) => isSameSentInvite(invite, nextInvite));
+  if (index < 0) {
+    return sortSentInvites([nextInvite, ...existingInvites]);
+  }
+
+  const next = [...existingInvites];
+  next[index] = { ...next[index], ...nextInvite };
+  return sortSentInvites(next);
+}
+
+function removeSentInvite(existingInvites, inviteToRemove) {
+  return existingInvites.filter((invite) => !isSameSentInvite(invite, inviteToRemove));
+}
+
+function areSentInviteListsEqual(left, right) {
+  if (left.length !== right.length) return false;
+  return left.every((invite, index) => {
+    const current = right[index];
+    if (!current) return false;
+    return invite.id === current.id
+      && invite.groupId === current.groupId
+      && invite.groupName === current.groupName
+      && invite.sentByUserId === current.sentByUserId
+      && invite.sentByDisplayName === current.sentByDisplayName
+      && invite.sentByEmail === current.sentByEmail
+      && invite.sentToEmail === current.sentToEmail
+      && invite.expiresAt === current.expiresAt
+      && invite.createdAt === current.createdAt
+      && invite.token === current.token;
+  });
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+}
+
+function getDeleteInviteValidationError(invite, actorUserId) {
+  if (!invite?.groupId) return "Invite group is unavailable for this row.";
+  if (!invite?.sentByUserId) return "Invite sender is unavailable for this row.";
+  if (!actorUserId || actorUserId === "-" || invite.sentByUserId !== actorUserId) {
+    return "Only the member who sent this invite can delete it.";
+  }
+  if (!invite?.id && !invite?.token) return "Invite identifier is unavailable for this row.";
+  return "";
+}
+
+function getRefreshInviteValidationError(invite, actorUserId) {
+  const deleteValidationError = getDeleteInviteValidationError(invite, actorUserId);
+  if (deleteValidationError) return deleteValidationError;
+  if (!getInviteRecipientEmail(invite)) return "Invite recipient email is unavailable for this row.";
+  return "";
+}
 
 export function useDashboardController({
   groups,
@@ -14,6 +177,7 @@ export function useDashboardController({
   setBusy,
   currentId,
   currentEmail,
+  me,
   loadSessionData,
   onOpenGroupPage
 }) {
@@ -27,58 +191,30 @@ export function useDashboardController({
   const [inviteCandidates, setInviteCandidates] = useState([]);
   const [inviteCandidatesLoading, setInviteCandidatesLoading] = useState(false);
   const [groupOwnershipById, setGroupOwnershipById] = useState({});
-
-  function normalizeEmail(value) {
-    return String(value || "").trim().toLowerCase();
-  }
-
-  function mergeSentInvites(existingInvites, incomingInvites) {
-    const map = new Map();
-    [...existingInvites, ...incomingInvites].forEach((invite) => {
-      const key = `${invite.groupId || ""}:${normalizeEmail(invite.email)}`;
-      const current = map.get(key);
-      if (!current) {
-        map.set(key, invite);
-        return;
-      }
-
-      const currentHasToken = Boolean(current.token);
-      const inviteHasToken = Boolean(invite.token);
-      if (!currentHasToken && inviteHasToken) {
-        map.set(key, invite);
-        return;
-      }
-
-      const currentTime = new Date(current.createdAt || 0).getTime();
-      const inviteTime = new Date(invite.createdAt || 0).getTime();
-      if (Number.isFinite(inviteTime) && inviteTime > currentTime) {
-        map.set(key, invite);
-      }
-    });
-
-    return [...map.values()].sort((a, b) => {
-      const aTime = new Date(a.createdAt || 0).getTime();
-      const bTime = new Date(b.createdAt || 0).getTime();
-      return bTime - aTime;
-    });
-  }
+  const pendingInvitesRequestIdRef = useRef(0);
+  const groupsSignature = groups.map((group) => `${group?.id || ""}:${group?.name || ""}`).join("|");
+  // Keep a stable group reference for effects that only care about id/name changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const groupsForEffects = useMemo(() => groups, [groupsSignature]);
 
   useEffect(() => {
     setGroupOwnershipById({});
+    setSentInvites([]);
+    setInviteResult(null);
   }, [currentId]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function resolveOwnership() {
-      if (!groups.length) {
+      if (!groupsForEffects.length) {
         if (!cancelled && Object.keys(groupOwnershipById).length > 0) {
           setGroupOwnershipById({});
         }
         return;
       }
 
-      const unresolved = groups
+      const unresolved = groupsForEffects
         .map((group) => group?.id)
         .filter((groupId) => groupId && groupOwnershipById[groupId] === undefined);
 
@@ -87,13 +223,24 @@ export function useDashboardController({
       const detailEntries = await Promise.all(unresolved.map(async (groupId) => {
         try {
           const detail = await groupService.details(groupId);
-          return [groupId, extractOwnershipFromDetail(detail, currentId)];
+          const isOwner = extractOwnershipFromDetail(detail, currentId);
+          const balanceCents = resolveGroupBalanceCents(detail, detail?.me);
+          return [groupId, isOwner, balanceCents];
         } catch {
-          return [groupId, null];
+          return [groupId, null, null];
         }
       }));
 
       if (cancelled) return;
+
+      // Sync personal balance from detail into group list items
+      setGroups((prev) =>
+        prev.map((g) => {
+          const entry = detailEntries.find(([id]) => id === g.id);
+          if (!entry || typeof entry[2] !== "number") return g;
+          return { ...g, netBalanceCents: entry[2] };
+        })
+      );
 
       setGroupOwnershipById((prev) => {
         const next = { ...prev };
@@ -102,7 +249,7 @@ export function useDashboardController({
         });
 
         Object.keys(next).forEach((groupId) => {
-          if (!groups.some((group) => group.id === groupId)) {
+          if (!groupsForEffects.some((group) => group.id === groupId)) {
             delete next[groupId];
           }
         });
@@ -115,27 +262,53 @@ export function useDashboardController({
     return () => {
       cancelled = true;
     };
-  }, [groups, currentId, groupOwnershipById]);
+  }, [currentId, groupOwnershipById, groupsForEffects, groupsSignature, setGroups]);
 
-  const loadPendingInvites = useCallback(async () => {
-    if (!getAccessToken() || !currentEmail || currentEmail === "-") {
-      setPendingInvites([]);
-      setPendingInvitesError("");
-      return;
-    }
+  const loadPendingInvites = useCallback(async (options = {}) => {
+    const force = options.force === true;
+    const announceRefresh = options.announceRefresh === true;
+    const requestId = pendingInvitesRequestIdRef.current + 1;
+    pendingInvitesRequestIdRef.current = requestId;
 
+    // Don't fetch until the session (me) has been loaded. The effect will
+    // re-run once me is set, at which point it can use me.receivedInvites
+    // directly (fast path) or fall through to the API call — but only once.
     setPendingInvitesLoading(true);
     setPendingInvitesError("");
     try {
-      const invites = await groupService.listPendingInvitesByEmail(currentEmail);
-      setPendingInvites(Array.isArray(invites) ? invites : []);
+      if (!getAccessToken() || !currentEmail || currentEmail === "-") {
+        setPendingInvites([]);
+        setPendingInvitesError("");
+        return;
+      }
+
+      if (!me) {
+        setPendingInvites([]);
+        return;
+      }
+
+      const invites = !force && Array.isArray(me?.receivedInvites)
+        ? me.receivedInvites
+        : await groupService.listPendingInvitesByEmail(currentEmail);
+      const normalized = Array.isArray(invites)
+        ? invites.map(normalizePendingInvite)
+        : [];
+      setPendingInvites(normalized);
+      if (force && announceRefresh) {
+        setSuccess(normalized.length ? "Pending invites refreshed." : "Pending invites refreshed. You're all caught up.");
+      }
     } catch (err) {
       setPendingInvites([]);
       setPendingInvitesError(err.message || "Could not load pending invites.");
+      if (force && announceRefresh) {
+        setError(err.message || "Could not load pending invites.");
+      }
     } finally {
-      setPendingInvitesLoading(false);
+      if (pendingInvitesRequestIdRef.current === requestId) {
+        setPendingInvitesLoading(false);
+      }
     }
-  }, [currentEmail]);
+  }, [currentEmail, me, setError, setSuccess]);
 
   useEffect(() => {
     loadPendingInvites();
@@ -163,7 +336,7 @@ export function useDashboardController({
       const existingInviteEmailSet = new Set(
         sentInvites
           .filter((invite) => invite.groupId === groupId)
-          .map((invite) => normalizeEmail(invite.email))
+          .map((invite) => normalizeEmail(getInviteRecipientEmail(invite)))
       );
       const filtered = normalized.filter((candidate) => !existingInviteEmailSet.has(normalizeEmail(candidate.email)));
       setInviteCandidates(filtered);
@@ -181,51 +354,67 @@ export function useDashboardController({
     }
   }, [sentInvites]);
 
-  const loadGroupSentInvites = useCallback(async (groupId) => {
-    if (!groupId || !getAccessToken()) {
-      return;
-    }
-
-    try {
-      const invites = await groupService.listGroupInvites(groupId);
-      const normalized = Array.isArray(invites)
-        ? invites.map((invite) => ({
-            id: invite.id || `${invite.groupId}:${invite.email}`,
-            groupId: invite.groupId || groupId,
-            groupName: "Group",
-            email: invite.email,
-            expiresAt: invite.expiresAt,
-            createdAt: invite.createdAt,
-            token: null
-          }))
-        : [];
-      setSentInvites((prev) => {
-        const next = mergeSentInvites(prev, normalized);
-        if (next.length !== prev.length) return next;
-        const changed = next.some((invite, index) => {
-          const current = prev[index];
-          if (!current) return true;
-          return invite.id !== current.id
-            || invite.groupId !== current.groupId
-            || invite.email !== current.email
-            || invite.expiresAt !== current.expiresAt
-            || invite.createdAt !== current.createdAt
-            || invite.token !== current.token;
-        });
-        return changed ? next : prev;
-      });
-    } catch {
-      // Keep existing local sent invites if list endpoint is unavailable.
-    }
-  }, []);
-
   useEffect(() => {
     loadInviteCandidates(selectedGroupId);
   }, [selectedGroupId, loadInviteCandidates]);
 
   useEffect(() => {
-    loadGroupSentInvites(selectedGroupId);
-  }, [selectedGroupId, loadGroupSentInvites]);
+    if (!getAccessToken()) {
+      setSentInvites([]);
+      return;
+    }
+
+    if (!groupsForEffects.length) {
+      setSentInvites([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadAllSentInvites() {
+      let inviteResults;
+      if (Array.isArray(me?.sentInvites)) {
+        inviteResults = [
+          me.sentInvites
+            .map((invite) => normalizeSentInvite(invite, {
+              currentId,
+              fallbackGroupId: invite?.groupId || "",
+              fallbackGroupName: invite?.groupName || groupsForEffects.find((group) => group.id === invite?.groupId)?.name || "Group",
+              fallbackSentByUserId: currentId
+            }))
+            .filter(Boolean)
+        ];
+      } else {
+        inviteResults = await Promise.all(
+          groupsForEffects.map(async (group) => {
+            try {
+              const invites = await groupService.listGroupInvites(group.id);
+              if (!Array.isArray(invites)) return [];
+              return invites
+                .map((invite) => normalizeSentInvite(invite, {
+                  currentId,
+                  fallbackGroupId: group.id,
+                  fallbackGroupName: group.name || invite?.groupName || "Group",
+                  fallbackSentByUserId: currentId
+                }))
+                .filter(Boolean);
+            } catch {
+              return [];
+            }
+          })
+        );
+      }
+
+      if (cancelled) return;
+      const normalized = sortSentInvites(inviteResults.flat());
+      setSentInvites((prev) => (areSentInviteListsEqual(prev, normalized) ? prev : normalized));
+    }
+
+    loadAllSentInvites();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentId, groupsForEffects, groupsSignature, me]);
 
   async function onCreateGroup(e) {
     e.preventDefault();
@@ -252,25 +441,28 @@ export function useDashboardController({
   async function onCreateInvite(e) {
     e.preventDefault();
     if (!selectedGroupId || !inviteEmail.trim()) return;
+    const requestedEmail = inviteEmail.trim();
 
     setError("");
     setSuccess("");
     setBusy(true);
     try {
-      const requestedEmail = inviteEmail.trim();
       const invite = await groupService.createInvite(selectedGroupId, requestedEmail);
-      const groupName = groups.find((group) => group.id === selectedGroupId)?.name || "Group";
-      setInviteResult(invite);
-      setSentInvites((prev) => [{
-        id: invite.token,
-        groupId: selectedGroupId,
-        groupName,
-        email: requestedEmail,
-        expiresAt: invite.expiresAt,
-        createdAt: new Date().toISOString(),
-        token: invite.token
-      }, ...prev]);
-      await loadGroupSentInvites(selectedGroupId);
+      const groupName = groups.find((group) => group?.id === selectedGroupId)?.name || "Group";
+      const normalizedInvite = normalizeSentInvite(invite, {
+        currentId,
+        fallbackGroupId: selectedGroupId,
+        fallbackGroupName: groupName,
+        fallbackSentToEmail: requestedEmail,
+        fallbackCreatedAt: new Date().toISOString(),
+        fallbackToken: invite?.token,
+        fallbackSentByUserId: currentId
+      });
+      if (!normalizedInvite) {
+        throw new Error("Could not map created invite.");
+      }
+      setInviteResult(normalizedInvite);
+      setSentInvites((prev) => upsertSentInvite(prev, normalizedInvite));
       setInviteCandidates((prev) => {
         const next = prev.filter((candidate) => normalizeEmail(candidate.email) !== normalizeEmail(requestedEmail));
         setInviteEmail((current) => {
@@ -289,8 +481,7 @@ export function useDashboardController({
           : details.includes("already a member")
           ? "this user is already a member of the group."
           : "an active invite already exists for this group, or the user is already a member.";
-        setError(`Could not create invite for ${inviteEmail.trim()}: ${specificReason}`);
-        await loadGroupSentInvites(selectedGroupId);
+        setError(`Could not create invite for ${requestedEmail}: ${specificReason}`);
         return;
       }
       setError(err.message || "Could not create invite.");
@@ -331,22 +522,87 @@ export function useDashboardController({
   }
 
   async function onDeleteInvite(invite) {
-    if (!invite?.groupId) return;
-    if (!invite?.token) {
-      setError("Invite token is unavailable for this row.");
+    const validationError = getDeleteInviteValidationError(invite, currentId);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setError("");
     setSuccess("");
     setBusy(true);
+    let previousInvites = null;
+    setSentInvites((prev) => {
+      previousInvites = prev;
+      return removeSentInvite(prev, invite);
+    });
     try {
-      await groupService.cancelInvite(invite.groupId, invite.token);
-      setSentInvites((prev) => prev.filter((item) => item.id !== invite.id));
-      await loadGroupSentInvites(invite.groupId);
+      if (isUuid(invite.id)) {
+        await groupService.cancelInviteById(invite.groupId, invite.id);
+      } else {
+        await groupService.cancelInvite(invite.groupId, invite.token);
+      }
       setSuccess("Invite deleted.");
     } catch (err) {
+      if (previousInvites) {
+        setSentInvites(previousInvites);
+      }
       setError(err.message || "Could not delete invite.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRefreshInvite(invite) {
+    const validationError = getRefreshInviteValidationError(invite, currentId);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    const recipientEmail = getInviteRecipientEmail(invite);
+    const groupName = groups.find((group) => group?.id === invite.groupId)?.name || invite.groupName || "Group";
+
+    setError("");
+    setSuccess("");
+    setBusy(true);
+    let previousInvites = null;
+    setSentInvites((prev) => {
+      previousInvites = prev;
+      return removeSentInvite(prev, invite);
+    });
+
+    try {
+      if (isUuid(invite.id)) {
+        await groupService.cancelInviteById(invite.groupId, invite.id);
+      } else {
+        await groupService.cancelInvite(invite.groupId, invite.token);
+      }
+
+      const refreshedInvite = await groupService.createInvite(invite.groupId, recipientEmail);
+      const normalizedInvite = normalizeSentInvite(refreshedInvite, {
+        currentId,
+        fallbackGroupId: invite.groupId,
+        fallbackGroupName: groupName,
+        fallbackSentToEmail: recipientEmail,
+        fallbackCreatedAt: new Date().toISOString(),
+        fallbackToken: refreshedInvite?.token,
+        fallbackSentByUserId: currentId
+      });
+
+      if (!normalizedInvite) {
+        throw new Error("Could not map refreshed invite.");
+      }
+
+      setInviteResult(normalizedInvite);
+      setSentInvites((prev) => upsertSentInvite(prev, normalizedInvite));
+      setSuccess("Invite refreshed.");
+    } catch (err) {
+      if (previousInvites) {
+        setSentInvites(previousInvites);
+      }
+      setInviteResult(null);
+      setError(err.message || "Could not refresh invite.");
     } finally {
       setBusy(false);
     }
@@ -372,7 +628,8 @@ export function useDashboardController({
       onCreateInvite,
       onAcceptPendingInvite,
       onDeleteInvite,
-      onRefreshPendingInvites: loadPendingInvites,
+      onRefreshInvite,
+      onRefreshPendingInvites: () => loadPendingInvites({ force: true, announceRefresh: true }),
       onOpenGroupPage,
       onResetDashboardState
     }

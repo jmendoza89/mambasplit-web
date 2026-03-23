@@ -1,11 +1,28 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { clearSession, getAccessToken, saveSession } from "../api";
 import { authService, submitAuth, submitGoogleAuth } from "../services";
 
 const GOOGLE_SCRIPT_ID = "google-identity-services-script";
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_TOKEN_MISSING_ERROR = "Google login failed: no ID token was returned. Please try again.";
 let googleScriptPromise = null;
+
+function getGoogleClientId() {
+  return import.meta.env.VITE_GOOGLE_CLIENT_ID;
+}
+
+function toGoogleLoginError(notification) {
+  const notDisplayedReason = notification?.getNotDisplayedReason?.();
+  if (notification?.isNotDisplayed?.() && notDisplayedReason) {
+    return `Google login failed: prompt was not displayed (${notDisplayedReason}).`;
+  }
+
+  const skippedReason = notification?.getSkippedReason?.();
+  if (notification?.isSkippedMoment?.() && skippedReason) {
+    return `Google login failed: prompt was skipped (${skippedReason}).`;
+  }
+
+  return GOOGLE_TOKEN_MISSING_ERROR;
+}
 
 function ensureGoogleScriptLoaded() {
   if (window.google?.accounts?.id) return Promise.resolve();
@@ -57,6 +74,10 @@ export function useAuthController({
   onResetGroupState
 }) {
   const isAuthenticated = Boolean(getAccessToken());
+  const [googleButtonNode, setGoogleButtonNode] = useState(null);
+  const [googleButtonStatus, setGoogleButtonStatus] = useState(() => (
+    getGoogleClientId() ? "loading" : "unconfigured"
+  ));
 
   useEffect(() => {
     (async () => {
@@ -105,7 +126,7 @@ export function useAuthController({
     }
   }
 
-  async function onGoogleLoginSuccess(credentialResponse) {
+  const onGoogleLoginSuccess = useCallback(async (credentialResponse) => {
     const idToken = credentialResponse?.credential;
     if (!idToken) {
       setError(GOOGLE_TOKEN_MISSING_ERROR);
@@ -127,17 +148,69 @@ export function useAuthController({
     } finally {
       setBusy(false);
     }
-  }
+  }, [loadSessionData, setBusy, setError, setSuccess, setUser]);
 
-  function onGoogleLoginError() {
-    setError(GOOGLE_TOKEN_MISSING_ERROR);
+  useEffect(() => {
+    const container = googleButtonNode;
+    if (!container) return;
+
+    const googleClientId = getGoogleClientId();
+    if (!googleClientId) {
+      container.innerHTML = "";
+      setGoogleButtonStatus("unconfigured");
+      return;
+    }
+
+    let cancelled = false;
+    setGoogleButtonStatus("loading");
+
+    (async () => {
+      try {
+        await ensureGoogleScriptLoaded();
+        if (cancelled || !window.google?.accounts?.id || !container.isConnected) {
+          return;
+        }
+
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: onGoogleLoginSuccess
+        });
+
+        container.innerHTML = "";
+        window.google.accounts.id.renderButton(container, {
+          theme: "outline",
+          size: "large",
+          shape: "pill",
+          text: authMode === "login" ? "signin_with" : "signup_with",
+          width: 220
+        });
+        setGoogleButtonStatus(container.childElementCount > 0 ? "ready" : "error");
+      } catch (err) {
+        if (!cancelled) {
+          setGoogleButtonStatus("error");
+          setError(err.message || "Unable to load Google Sign-In.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (container) {
+        container.innerHTML = "";
+      }
+    };
+  }, [authMode, googleButtonNode, onGoogleLoginSuccess, setError]);
+
+  function onGoogleLoginError(notification) {
+    setError(toGoogleLoginError(notification));
   }
 
   async function onGoogleLogin() {
     setError("");
     setSuccess("");
 
-    if (!GOOGLE_CLIENT_ID) {
+    const googleClientId = getGoogleClientId();
+    if (!googleClientId) {
       setError("Google login is not configured.");
       return;
     }
@@ -149,13 +222,13 @@ export function useAuthController({
       }
 
       window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
+        client_id: googleClientId,
         callback: onGoogleLoginSuccess
       });
 
       window.google.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          onGoogleLoginError();
+          onGoogleLoginError(notification);
         }
       });
     } catch (err) {
@@ -196,6 +269,8 @@ export function useAuthController({
 
   return {
     isAuthenticated,
+    googleButtonRef: setGoogleButtonNode,
+    googleButtonStatus,
     onSubmitAuth,
     onGoogleLogin,
     onLogout,

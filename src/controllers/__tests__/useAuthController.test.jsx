@@ -21,6 +21,73 @@ vi.mock("../../services", () => ({
 }));
 
 describe("useAuthController", () => {
+  it("surfaces the Google prompt reason when the prompt is not displayed", async () => {
+    vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "test-google-client-id");
+    window.google = {
+      accounts: {
+        id: {
+          initialize: vi.fn(),
+          prompt: vi.fn((callback) => {
+            callback({
+              isNotDisplayed: () => true,
+              isSkippedMoment: () => false,
+              getNotDisplayedReason: () => "unregistered_origin"
+            });
+          })
+        }
+      }
+    };
+
+    const setLoading = vi.fn();
+    const setError = vi.fn();
+    const setSuccess = vi.fn();
+    const setBusy = vi.fn();
+    const setUser = vi.fn();
+    const setMe = vi.fn();
+    const setGroups = vi.fn();
+    const setSelectedGroupId = vi.fn();
+    const setGroupDetail = vi.fn();
+    const setGroupError = vi.fn();
+    const setGroupDetailStatusById = vi.fn();
+    const setActiveView = vi.fn();
+    const setAuthMode = vi.fn();
+    const loadSessionData = vi.fn(async () => {});
+    const onResetDashboardState = vi.fn();
+    const onResetGroupState = vi.fn();
+
+    const { result } = renderHook(() =>
+      useAuthController({
+        authMode: "login",
+        email: "test@example.com",
+        password: "password123",
+        displayName: "",
+        setLoading,
+        setError,
+        setSuccess,
+        setBusy,
+        setUser,
+        setMe,
+        setGroups,
+        setSelectedGroupId,
+        setGroupDetail,
+        setGroupError,
+        setGroupDetailStatusById,
+        setActiveView,
+        setAuthMode,
+        loadSessionData,
+        onResetDashboardState,
+        onResetGroupState
+      })
+    );
+
+    await result.current.onGoogleLogin();
+
+    expect(setError).toHaveBeenCalledWith(
+      "Google login failed: prompt was not displayed (unregistered_origin)."
+    );
+    vi.unstubAllEnvs();
+  });
+
   it("submits auth and refreshes session data", async () => {
     const setLoading = vi.fn();
     const setError = vi.fn();

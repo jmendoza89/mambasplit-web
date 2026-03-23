@@ -45,6 +45,7 @@ export function useGroupController({
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseSavedStatus, setExpenseSavedStatus] = useState(null);
   const [isSettleUpModalOpen, setIsSettleUpModalOpen] = useState(false);
+  const [isLeaveGroupModalOpen, setIsLeaveGroupModalOpen] = useState(false);
   const [recentSettlementId, setRecentSettlementId] = useState(null);
   const expenseDescriptionRef = useRef(null);
   const expenseAmountRef = useRef(null);
@@ -113,6 +114,18 @@ export function useGroupController({
     try {
       const detail = await groupService.details(groupId);
       setGroupDetail(detail);
+
+      // Sync the user's personal balance from detail back into the groups list
+      // so the dashboard card reflects the same balance shown in the group view.
+      const syncedBalance = detail?.me?.netBalanceCents ?? detail?.summary?.netBalanceCents;
+      if (typeof syncedBalance === "number") {
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === groupId ? { ...g, netBalanceCents: syncedBalance } : g
+          )
+        );
+      }
+
       setGroupDetailStatusById((prev) => {
         if (!(groupId in prev)) return prev;
         const next = { ...prev };
@@ -132,13 +145,13 @@ export function useGroupController({
     } finally {
       setGroupLoading(false);
     }
-  }, [groupDetailStatusById, setGroupError, setGroupDetail, setGroupDetailStatusById]);
+  }, [groupDetailStatusById, setGroupError, setGroupDetail, setGroupDetailStatusById, setGroups]);
 
   useEffect(() => {
     if (activeView !== "group" || !selectedGroupId) return;
     if (groupDetail && (groupDetail.group?.id === selectedGroupId || groupDetail.id === selectedGroupId)) return;
     loadGroupDetail(selectedGroupId);
-  }, [activeView, selectedGroupId, groupDetail, loadGroupDetail]);
+  }, [activeView, selectedGroupId, groupDetail, loadGroupDetail, groups]);
 
   useEffect(() => {
     if (!isExpenseModalOpen) return;
@@ -373,6 +386,46 @@ export function useGroupController({
     setIsSettleUpModalOpen(false);
   }
 
+  function onOpenLeaveGroupModal() {
+    if (!selectedGroupId) return;
+    setIsLeaveGroupModalOpen(true);
+  }
+
+  function onCancelLeaveGroup() {
+    setIsLeaveGroupModalOpen(false);
+  }
+
+  async function onConfirmLeaveGroup() {
+    if (!selectedGroupId) return;
+    setError("");
+    setSuccess("");
+    setBusy(true);
+    try {
+      await groupService.leaveGroup(selectedGroupId);
+      const leftId = selectedGroupId;
+      const remaining = groups.filter((group) => group.id !== leftId);
+      setGroups(remaining);
+      setSelectedGroupId((remaining[0] && remaining[0].id) || "");
+      setGroupDetail(null);
+      setGroupError("");
+      setLocalGroupError("");
+      setGroupDetailStatusById((prev) => {
+        if (!(leftId in prev)) return prev;
+        const next = { ...prev };
+        delete next[leftId];
+        return next;
+      });
+      setIsLeaveGroupModalOpen(false);
+      setActiveView("dashboard");
+      setSuccess("You have left the group.");
+    } catch (err) {
+      setError(err.message || "Could not leave group.");
+      setIsLeaveGroupModalOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function onResetGroupState() {
     setExpenseDescription("");
     setExpenseAmount("");
@@ -402,6 +455,7 @@ export function useGroupController({
       totalSettlementAmount,
       isExpenseModalOpen,
       isSettleUpModalOpen,
+      isLeaveGroupModalOpen,
       recentSettlementId,
       expenseDescription,
       expenseAmount,
@@ -423,6 +477,9 @@ export function useGroupController({
       onCreateSettlement,
       onDeleteExpense,
       onDeleteGroup,
+      onOpenLeaveGroupModal,
+      onCancelLeaveGroup,
+      onConfirmLeaveGroup,
       onRefreshGroupDetail: () => loadGroupDetail(selectedGroupId, { force: true }),
       setExpenseDescription,
       setExpenseAmount,

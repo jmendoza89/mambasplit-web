@@ -12,23 +12,38 @@ export const AuthContext = createContext({
   // Computed user info
   currentName: "User",
   currentEmail: "-",
+  currentPhone: "",
   currentId: "-",
+  currentAvatarUrl: "",
   
   // Auth form state
   authMode: "login",
   email: "",
   password: "",
+  resetConfirmPassword: "",
+  resetTokenStatus: "idle",
+  passwordResetOutbox: null,
+  passwordResetTestValue: "",
+  showResetTestHarness: false,
   displayName: "",
   
   // Auth actions
   setAuthMode: () => {},
   setEmail: () => {},
   setPassword: () => {},
+  setResetConfirmPassword: () => {},
   setDisplayName: () => {},
   onSubmitAuth: () => {},
   onGoogleLogin: () => {},
+  googleButtonRef: null,
+  googleButtonStatus: "idle",
   onLogout: () => {},
-  onToggleAuthMode: () => {}
+  onToggleAuthMode: () => {},
+  onStartPasswordReset: () => {},
+  onReturnToLogin: () => {},
+  onRequestPasswordReset: () => {},
+  onOpenPasswordResetLink: () => {},
+  onSubmitPasswordReset: () => {}
 });
 
 /**

@@ -3,6 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatDate, formatMoney, initials } from "../utils/formatters";
+import { resolveGroupBalanceCents } from "../utils/groupBalance";
+import ExpenseCardItem from "./components/ExpenseCardItem";
+import GroupDetailsHero from "./components/GroupDetailsHero";
+import MemberCardItem from "./components/MemberCardItem";
+import LeaveGroupModal from "./LeaveGroupModal";
 import SettleUpModal from "./SettleUpModal";
 
 export default function GroupView({
@@ -34,10 +39,15 @@ export default function GroupView({
   isSettleUpModalOpen,
   onDeleteExpense,
   onRefreshGroupDetail,
-  onDeleteGroup
+  onDeleteGroup,
+  isLeaveGroupModalOpen,
+  onOpenLeaveGroupModal,
+  onCancelLeaveGroup,
+  onConfirmLeaveGroup
 }) {
   const { currentId, currentName, onLogout } = useAuth();
   const { busy } = useAlerts();
+  const showBalanceDiagnostics = false;
   const [collapsedSettlementIds, setCollapsedSettlementIds] = useState({});
   const activeExpenses = useMemo(() => {
     const hiddenIds = new Set();
@@ -66,6 +76,48 @@ export default function GroupView({
     )),
     [activeExpenses, settledExpenseIdSet]
   );
+  const unsettledNetByUserId = useMemo(() => {
+    const map = new Map();
+    for (const member of displayMembers || []) {
+      if (member?.id) map.set(member.id, 0);
+    }
+
+    for (const expense of unsettledExpenses || []) {
+      const payerUserId = expense?.payerUserId;
+      if (payerUserId) {
+        map.set(payerUserId, (map.get(payerUserId) || 0) + (expense?.amountCents || 0));
+      }
+
+      for (const split of expense?.splits || []) {
+        if (!split?.userId) continue;
+        map.set(split.userId, (map.get(split.userId) || 0) - (split?.amountOwedCents || 0));
+      }
+    }
+
+    return map;
+  }, [displayMembers, unsettledExpenses]);
+  const currentUserUnsettledNetCents = unsettledNetByUserId.get(currentId) || 0;
+  const balanceDiagnostics = useMemo(() => {
+    const rows = (displayMembers || []).map((member, index) => {
+      const memberId = member?.id || `member-${index}`;
+      const apiNetCents = typeof member?.netBalanceCents === "number" ? member.netBalanceCents : 0;
+      const unsettledNetCents = unsettledNetByUserId.get(memberId) || 0;
+      const deltaCents = apiNetCents - unsettledNetCents;
+
+      return {
+        memberId,
+        name: member?.name || "Member",
+        apiNetCents,
+        unsettledNetCents,
+        deltaCents
+      };
+    }).sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents));
+
+    return {
+      rows,
+      hasMismatch: rows.some((row) => row.deltaCents !== 0)
+    };
+  }, [displayMembers, unsettledNetByUserId]);
   const settledExpenseGroups = useMemo(() => {
     const grouped = activeExpenses.reduce((acc, expense) => {
       const effectiveSettlementId = expense.settlementId
@@ -144,35 +196,71 @@ export default function GroupView({
             >
               Delete Group
             </button>
+            <button
+              className="btn-danger"
+              type="button"
+              onClick={onOpenLeaveGroupModal}
+              disabled={busy || groupLoading || !selectedGroupId || isGroupOwner}
+              title={isGroupOwner ? "Group owners cannot leave their group" : "Leave this group"}
+            >
+              Leave Group
+            </button>
             <button className="btn-ghost" type="button" onClick={onLogout} disabled={busy}>
               Logout
+            </button>
+            <button
+              className="top-user-avatar-btn"
+              type="button"
+              onClick={onBackToDashboard}
+              title={`Go to dashboard (${currentName || "User"})`}
+              aria-label={`Go to dashboard as ${currentName || "User"}`}
+            >
+              <span className="avatar top-user-avatar">{initials(currentName)}</span>
             </button>
           </div>
         </div>
 
-        <motion.div
-          className="group-hero"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: "easeOut" }}
-        >
-          <h2>{detailsGroupInfo?.name || displayedGroup?.name || "Group"}</h2>
-          <p>Track members and expenses in one place.</p>
-          <div className="chip-row">
-            <span className="chip chip-soft">ID: {detailsGroupInfo?.id || selectedGroupId || "-"}</span>
-            <span className="chip chip-soft">Members: {effectiveMemberCount}</span>
-            <span className="chip chip-soft">Expenses: {expenseCount}</span>
-            <span className="chip chip-soft">Total: {formatMoney(totalExpense)}</span>
-            <span className="chip chip-soft">Settlements: {settlementCount}</span>
-            <span className="chip chip-soft">Settled: {formatMoney(totalSettlementAmount)}</span>
-            <span className="chip chip-soft">My Role: {effectiveMyRole}</span>
-            <span className="chip chip-soft">My Net: {formatMoney((detailsMe?.netBalanceCents || 0) / 100)}</span>
-          </div>
-          <div className="chip-row">
-            <span className="chip chip-soft">Created: {formatDate(detailsGroupInfo?.createdAt)}</span>
-            <span className="chip chip-soft">Owner ID: {detailsGroupInfo?.createdBy || "-"}</span>
-          </div>
-        </motion.div>
+        <GroupDetailsHero
+          groupName={detailsGroupInfo?.name || displayedGroup?.name || "Group"}
+          createdAt={detailsGroupInfo?.createdAt}
+          memberCount={effectiveMemberCount}
+          expenseCount={expenseCount}
+          totalExpense={totalExpense}
+          settlementCount={settlementCount}
+          totalSettlementAmount={totalSettlementAmount}
+          netBalanceCents={resolveGroupBalanceCents(displayedGroup, detailsMe)}
+          role={effectiveMyRole}
+          isGroupOwner={isGroupOwner}
+        />
+
+        {showBalanceDiagnostics && balanceDiagnostics.rows.length ? (
+          <section className={`group-diagnostics ${balanceDiagnostics.hasMismatch ? "has-mismatch" : "is-clean"}`.trim()}>
+            <div className="group-diagnostics-head">
+              <strong>Balance Diagnostics</strong>
+              <span>
+                {balanceDiagnostics.hasMismatch
+                  ? "Potential mismatch: API net and unsettled-only net differ."
+                  : "No mismatch detected: API net aligns with unsettled-only net."}
+              </span>
+            </div>
+            <div className="group-diagnostics-grid" role="table" aria-label="Balance diagnostics">
+              <p className="group-diagnostics-header" role="row">
+                <span role="columnheader">Member</span>
+                <span role="columnheader">API Net</span>
+                <span role="columnheader">Unsettled Net</span>
+                <span role="columnheader">Delta</span>
+              </p>
+              {balanceDiagnostics.rows.map((row) => (
+                <p key={row.memberId} className={`group-diagnostics-row ${row.deltaCents !== 0 ? "is-mismatch" : ""}`.trim()} role="row">
+                  <span role="cell">{row.name}</span>
+                  <span role="cell">{formatMoney(row.apiNetCents / 100)}</span>
+                  <span role="cell">{formatMoney(row.unsettledNetCents / 100)}</span>
+                  <span role="cell">{formatMoney(row.deltaCents / 100)}</span>
+                </p>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {groupError ? <p className="alert">{groupError}</p> : null}
 
@@ -194,27 +282,21 @@ export default function GroupView({
                   initial="hidden"
                   animate="visible"
                 >
-                  {displayMembers.map((member, index) => (
+                  {displayMembers.map((member, index) => {
+                    const isOwnerMember = member?.role === "OWNER"
+                      || (Boolean(detailsGroupInfo?.createdBy) && member?.id === detailsGroupInfo.createdBy);
+                    return (
                     <motion.li
                       key={member.id || `${member.name}-${index}`}
+                      className="member-motion-item"
                       variants={itemVariants}
                       whileHover={{ y: -2, scale: 1.005 }}
                       transition={{ duration: 0.16 }}
                     >
-                      <div className="avatar">{initials(member.name)}</div>
-                      <div>
-                        <strong>{member.name}</strong>
-                        <p>{member.email || "No email on record"}</p>
-                        <p>
-                          {member.role || "MEMBER"}
-                          {member.joinedAt ? ` | Joined ${formatDate(member.joinedAt)}` : ""}
-                          {typeof member.netBalanceCents === "number"
-                            ? ` | Net ${formatMoney(member.netBalanceCents / 100)}`
-                            : ""}
-                        </p>
-                      </div>
+                      <MemberCardItem member={member} isOwner={isOwnerMember} />
                     </motion.li>
-                  ))}
+                    );
+                  })}
                 </motion.ul>
               ) : (
                 <p className="list-empty">No members found for this group yet.</p>
@@ -245,46 +327,28 @@ export default function GroupView({
                         whileHover={{ y: -2, scale: 1.005 }}
                         transition={{ duration: 0.16 }}
                       >
-                        <div className="expense-main">
-                          <strong className="expense-title">{expense.description || "Expense"}</strong>
-                          <p className="expense-meta">
-                            Paid by {expense.paidBy || "Unknown"}
-                            {expense.createdAt ? ` | ${formatDate(expense.createdAt)}` : ""}
-                          </p>
-                          {expense.splits?.length ? (
-                            <p className="expense-split">
-                              Split: {expense.splits.map((split) => (
-                                `${split.userDisplayName}: ${formatMoney((split.amountOwedCents || 0) / 100)}`
-                              )).join(", ")}
-                            </p>
-                          ) : null}
-                        </div>
-                        <div className="expense-actions">
-                          <span className="expense-amount">{formatMoney(expense.amount, expense.currency)}</span>
-                          <button
-                            className="btn-danger btn-inline expense-delete"
-                            type="button"
-                            onClick={() => onDeleteExpense(expense.id)}
-                            disabled={
-                              busy
-                              || groupLoading
-                              || !expense.id
-                              || !expense.payerUserId
-                              || Boolean(expense.settlementId)
-                              || settledExpenseIdSet.has(expense.id)
-                              || expense.payerUserId !== currentId
-                            }
-                            title={
-                              expense.settlementId || settledExpenseIdSet.has(expense.id)
-                                ? "Settled expenses cannot be deleted"
-                                : expense.payerUserId === currentId
-                                ? "Delete this expense"
-                                : "Only the expense owner can delete this expense"
-                            }
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        <ExpenseCardItem
+                          expense={expense}
+                          currentUserId={currentId}
+                          currentUserName={currentName}
+                          onDeleteExpense={onDeleteExpense}
+                          deleteDisabled={
+                            busy
+                            || groupLoading
+                            || !expense.id
+                            || !expense.payerUserId
+                            || Boolean(expense.settlementId)
+                            || settledExpenseIdSet.has(expense.id)
+                            || expense.payerUserId !== currentId
+                          }
+                          deleteTitle={
+                            expense.settlementId || settledExpenseIdSet.has(expense.id)
+                              ? "Settled expenses cannot be deleted"
+                              : expense.payerUserId === currentId
+                              ? "Delete this expense"
+                              : "Only the expense owner can delete this expense"
+                          }
+                        />
                       </motion.li>
                     ))}
                   </motion.ul>
@@ -331,13 +395,18 @@ export default function GroupView({
 
                           {!isCollapsed ? (
                             <div id={`settlement-group-${group.settlementId}`} className="settled-group-body">
-                              {group.expenses.map((expense) => (
-                                <div key={expense.id} className="settled-group-expense">
-                                  <span>{expense.description || "Expense"}</span>
-                                  <span>{formatMoney(expense.amount, expense.currency)}</span>
-                                  <span>{formatDate(expense.createdAt)}</span>
-                                </div>
-                              ))}
+                              <ul className="expense-list settled-expense-list">
+                                {group.expenses.map((expense) => (
+                                  <li key={expense.id} className="expense-card expense-card-no-delete">
+                                    <ExpenseCardItem
+                                      expense={expense}
+                                      currentUserId={currentId}
+                                      currentUserName={currentName}
+                                      showDeleteButton={false}
+                                    />
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
                           ) : null}
                         </li>
@@ -363,6 +432,15 @@ export default function GroupView({
         settlementSuggestions={settlementSuggestions}
         groupName={detailsGroupInfo?.name || displayedGroup?.name || "Group"}
         onSaveSettlement={onCreateSettlement}
+      />
+
+      <LeaveGroupModal
+        isOpen={Boolean(isLeaveGroupModalOpen)}
+        onClose={onCancelLeaveGroup}
+        onConfirm={onConfirmLeaveGroup}
+        groupName={detailsGroupInfo?.name || displayedGroup?.name || "Group"}
+        currentUserUnsettledNetCents={currentUserUnsettledNetCents}
+        busy={busy}
       />
     </section>
   );

@@ -7,6 +7,7 @@ import AuthView from "./views/AuthView";
 import DashboardView from "./views/DashboardView";
 import ExpenseModal from "./views/ExpenseModal";
 import GroupView from "./views/GroupView";
+import AccountView from "./views/AccountView";
 import { itemVariants, listVariants } from "./views/animations";
 import Alerts from "./views/components/Alerts";
 import Header from "./views/components/Header";
@@ -21,38 +22,68 @@ export default function App() {
     isAuthenticated: state.isAuthenticated,
     currentName: state.currentName,
     currentEmail: state.currentEmail,
+    currentPhone: state.currentPhone,
     currentId: state.currentId,
+    currentAvatarUrl: state.currentAvatarUrl,
     authMode: state.authMode,
     email: state.email,
     password: state.password,
+    resetConfirmPassword: state.resetConfirmPassword,
+    resetTokenStatus: state.resetTokenStatus,
+    passwordResetOutbox: state.passwordResetOutbox,
+    passwordResetTestValue: state.passwordResetTestValue,
+    showResetTestHarness: state.showResetTestHarness,
     displayName: state.displayName,
     setAuthMode: actions.setAuthMode,
     setEmail: actions.setEmail,
     setPassword: actions.setPassword,
+    setResetConfirmPassword: actions.setResetConfirmPassword,
     setDisplayName: actions.setDisplayName,
     onSubmitAuth: actions.onSubmitAuth,
     onGoogleLogin: actions.onGoogleLogin,
+    googleButtonRef: refs.googleButtonRef,
+    googleButtonStatus: state.googleButtonStatus,
     onLogout: actions.onLogout,
-    onToggleAuthMode: actions.onToggleAuthMode
+    onToggleAuthMode: actions.onToggleAuthMode,
+    onStartPasswordReset: actions.onStartPasswordReset,
+    onReturnToLogin: actions.onReturnToLogin,
+    onRequestPasswordReset: actions.onRequestPasswordReset,
+    onOpenPasswordResetLink: actions.onOpenPasswordResetLink,
+    onSubmitPasswordReset: actions.onSubmitPasswordReset
   }), [
     state.user,
     state.me,
     state.isAuthenticated,
     state.currentName,
     state.currentEmail,
+    state.currentPhone,
     state.currentId,
+    state.currentAvatarUrl,
     state.authMode,
     state.email,
     state.password,
+    state.resetConfirmPassword,
+    state.resetTokenStatus,
+    state.passwordResetOutbox,
+    state.passwordResetTestValue,
+    state.showResetTestHarness,
     state.displayName,
     actions.setAuthMode,
     actions.setEmail,
     actions.setPassword,
+    actions.setResetConfirmPassword,
     actions.setDisplayName,
     actions.onSubmitAuth,
     actions.onGoogleLogin,
+    refs.googleButtonRef,
+    state.googleButtonStatus,
     actions.onLogout,
-    actions.onToggleAuthMode
+    actions.onToggleAuthMode,
+    actions.onStartPasswordReset,
+    actions.onReturnToLogin,
+    actions.onRequestPasswordReset,
+    actions.onOpenPasswordResetLink,
+    actions.onSubmitPasswordReset
   ]);
 
   const alertContextValue = useMemo(() => ({
@@ -95,7 +126,7 @@ export default function App() {
           <Header />
           <Alerts error={state.error} success={state.success} />
 
-          {!state.isAuthenticated ? (
+          {!state.isAuthenticated || state.isResetAuthMode ? (
             <AuthView />
           ) : state.activeView === "dashboard" ? (
           <DashboardView
@@ -115,14 +146,29 @@ export default function App() {
             inviteCandidatesLoading={state.inviteCandidatesLoading}
             groupOwnershipById={state.groupOwnershipById}
             onOpenGroupPage={actions.onOpenGroupPage}
+            onOpenAccount={() => actions.setActiveView("account")}
             onCreateGroup={actions.onCreateGroup}
             onCreateInvite={actions.onCreateInvite}
             onAcceptPendingInvite={actions.onAcceptPendingInvite}
             onDeleteInvite={actions.onDeleteInvite}
+            onRefreshInvite={actions.onRefreshInvite}
             onRefreshPendingInvites={actions.onRefreshPendingInvites}
+            onStartPasswordReset={actions.onStartPasswordReset}
             setSelectedGroupId={actions.setSelectedGroupId}
             setNewGroupName={actions.setNewGroupName}
             setInviteEmail={actions.setInviteEmail}
+          />
+        ) : state.activeView === "account" ? (
+          <AccountView
+            currentName={state.currentName}
+            currentEmail={state.currentEmail}
+            currentPhone={state.currentPhone}
+            currentAvatarUrl={state.currentAvatarUrl}
+            hasGoogleLogin={state.currentHasGoogleLogin}
+            busy={state.busy}
+            onBackToDashboard={() => actions.setActiveView("dashboard")}
+            onSaveAccountProfile={actions.onSaveAccountProfile}
+            onChangePassword={actions.onChangePassword}
           />
         ) : (
           <GroupView
@@ -155,6 +201,10 @@ export default function App() {
             onDeleteExpense={actions.onDeleteExpense}
             onRefreshGroupDetail={actions.onRefreshGroupDetail}
             onDeleteGroup={actions.onDeleteGroup}
+            isLeaveGroupModalOpen={state.isLeaveGroupModalOpen}
+            onOpenLeaveGroupModal={actions.onOpenLeaveGroupModal}
+            onCancelLeaveGroup={actions.onCancelLeaveGroup}
+            onConfirmLeaveGroup={actions.onConfirmLeaveGroup}
           />
         )}
       </motion.main>

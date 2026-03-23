@@ -20,6 +20,61 @@ function toIsoLocalDateTime(dateOnlyText) {
   return `${dateOnlyText}T00:00:00${sign}${hours}:${minutes}`;
 }
 
+function pairKey(fromUserId, toUserId) {
+  return `${fromUserId || ""}->${toUserId || ""}`;
+}
+
+function computePairBalanceCents(expenses, fromUserId, toUserId) {
+  if (!fromUserId || !toUserId) return 0;
+
+  let netCents = 0;
+  for (const expense of expenses || []) {
+    const splits = Array.isArray(expense?.splits) ? expense.splits : [];
+    if (expense?.payerUserId === toUserId) {
+      const owedByFrom = splits
+        .filter((split) => split?.userId === fromUserId)
+        .reduce((sum, split) => sum + (split?.amountOwedCents || 0), 0);
+      netCents += owedByFrom;
+    }
+
+    if (expense?.payerUserId === fromUserId) {
+      const owedByTo = splits
+        .filter((split) => split?.userId === toUserId)
+        .reduce((sum, split) => sum + (split?.amountOwedCents || 0), 0);
+      netCents -= owedByTo;
+    }
+  }
+
+  return Math.max(0, netCents);
+}
+
+function pickBestReceiverId(currentUserId, members, expenses, suggestions) {
+  if (!currentUserId) return "";
+  const receiverCandidates = (members || []).filter((member) => member?.id && member.id !== currentUserId);
+  if (!receiverCandidates.length) return "";
+
+  let bestReceiverId = "";
+  let bestAmount = 0;
+  for (const candidate of receiverCandidates) {
+    const amountCents = computePairBalanceCents(expenses, currentUserId, candidate.id);
+    if (amountCents > bestAmount) {
+      bestAmount = amountCents;
+      bestReceiverId = candidate.id;
+    }
+  }
+
+  if (bestReceiverId) return bestReceiverId;
+
+  const suggestionReceiverId = (suggestions || []).find(
+    (suggestion) => suggestion?.fromUserId === currentUserId && suggestion?.toUserId && suggestion.toUserId !== currentUserId
+  )?.toUserId;
+  if (suggestionReceiverId && receiverCandidates.some((member) => member.id === suggestionReceiverId)) {
+    return suggestionReceiverId;
+  }
+
+  return receiverCandidates[0]?.id || "";
+}
+
 export default function SettleUpModal({
   isOpen,
   onClose,
@@ -59,6 +114,26 @@ export default function SettleUpModal({
     ), 0),
     [autoSelectedExpenseIds, expenseById]
   );
+  const suggestionAmountByPair = useMemo(() => {
+    const map = new Map();
+    for (const suggestion of safeSuggestions) {
+      const key = pairKey(suggestion?.fromUserId, suggestion?.toUserId);
+      if (!key) continue;
+      map.set(key, suggestion?.amountCents || 0);
+    }
+    return map;
+  }, [safeSuggestions]);
+  const expectedPairAmountCents = useMemo(() => {
+    const computedFromExpenses = computePairBalanceCents(safeExpenses, fromUserId, toUserId);
+    if (computedFromExpenses > 0) {
+      return computedFromExpenses;
+    }
+    const fromToSuggestion = suggestionAmountByPair.get(pairKey(fromUserId, toUserId));
+    if (typeof fromToSuggestion === "number" && fromToSuggestion > 0) {
+      return fromToSuggestion;
+    }
+    return Math.max(0, autoSelectedExpenseTotalCents);
+  }, [suggestionAmountByPair, fromUserId, toUserId, safeExpenses, autoSelectedExpenseTotalCents]);
   const selectedFromMember = safeMembers.find((member) => member.id === fromUserId) || null;
   const selectedToMember = safeMembers.find((member) => member.id === toUserId) || null;
 
@@ -74,18 +149,30 @@ export default function SettleUpModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const firstSuggestion = safeSuggestions[0];
-    if (firstSuggestion) {
-      setFromUserId(firstSuggestion.fromUserId || "");
-      setToUserId(firstSuggestion.toUserId || "");
-      setCashAmount((Math.max(0, autoSelectedExpenseTotalCents) / 100).toFixed(2));
-      return;
-    }
-    const fallbackCounterparty = safeMembers.find((member) => member.id !== currentUserId);
+    const resolvedToUserId = pickBestReceiverId(currentUserId, safeMembers, safeExpenses, safeSuggestions);
+    const computedFromExpenses = computePairBalanceCents(safeExpenses, currentUserId, resolvedToUserId);
+    const suggestedAmount = suggestionAmountByPair.get(pairKey(currentUserId, resolvedToUserId)) || 0;
+    const resolvedAmountCents = computedFromExpenses > 0
+      ? computedFromExpenses
+      : Math.max(0, suggestedAmount || autoSelectedExpenseTotalCents);
     setFromUserId(currentUserId || "");
-    setToUserId(fallbackCounterparty?.id || "");
-    setCashAmount((Math.max(0, autoSelectedExpenseTotalCents) / 100).toFixed(2));
-  }, [isOpen, safeMembers, safeSuggestions, currentUserId, autoSelectedExpenseTotalCents]);
+    setToUserId(resolvedToUserId);
+    setCashAmount((resolvedAmountCents / 100).toFixed(2));
+  }, [
+    isOpen,
+    safeMembers,
+    safeSuggestions,
+    safeExpenses,
+    currentUserId,
+    autoSelectedExpenseTotalCents,
+    suggestionAmountByPair
+  ]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!fromUserId || !toUserId) return;
+    setCashAmount((Math.max(0, expectedPairAmountCents) / 100).toFixed(2));
+  }, [isOpen, fromUserId, toUserId, expectedPairAmountCents]);
 
   const handleCashAmountChange = (event) => {
     const nextValue = event.target.value;
@@ -94,13 +181,19 @@ export default function SettleUpModal({
   };
 
   const handleSave = async () => {
+    const effectiveFromUserId = currentUserId || "";
     const amountCents = Math.round(Number(cashAmount || "0") * 100);
-    if (!fromUserId || !toUserId) {
+    if (!effectiveFromUserId) {
+      setLocalError("Could not determine current user id for payer.");
+      return;
+    }
+
+    if (!toUserId) {
       setLocalError("Select both payer and receiver.");
       return;
     }
 
-    if (fromUserId === toUserId) {
+    if (effectiveFromUserId === toUserId) {
       setLocalError("Payer and receiver must be different members.");
       return;
     }
@@ -110,14 +203,19 @@ export default function SettleUpModal({
       return;
     }
 
+    if (autoSelectedExpenseIds.length === 0) {
+      setLocalError("No unsettled expenses are available to settle.");
+      return;
+    }
+
     if (!settlementDate) {
       setLocalError("Settlement date is required.");
       return;
     }
 
-    if (autoSelectedExpenseIds.length > 0 && amountCents !== autoSelectedExpenseTotalCents) {
+    if (expectedPairAmountCents > 0 && amountCents !== expectedPairAmountCents) {
       setLocalError(
-        `Settlement amount (${(amountCents / 100).toFixed(2)}) must match selected expenses (${(autoSelectedExpenseTotalCents / 100).toFixed(2)}).`
+        `Settlement amount (${(amountCents / 100).toFixed(2)}) must match outstanding balance (${(expectedPairAmountCents / 100).toFixed(2)}).`
       );
       return;
     }
@@ -126,7 +224,7 @@ export default function SettleUpModal({
     setSaving(true);
     try {
       const result = await onSaveSettlement({
-        fromUserId,
+        fromUserId: effectiveFromUserId,
         toUserId,
         amountCents,
         expenseIds: autoSelectedExpenseIds,
@@ -200,12 +298,9 @@ export default function SettleUpModal({
                   <select
                     id="settlementFromUser"
                     value={fromUserId}
-                    onChange={(event) => setFromUserId(event.target.value)}
+                    disabled
                   >
-                    <option value="">Select payer</option>
-                    {safeMembers.map((member) => (
-                      <option key={member.id} value={member.id}>{member.name}</option>
-                    ))}
+                    <option value={currentUserId || ""}>{selectedFromMember?.name || currentUserName || "You"}</option>
                   </select>
                 </div>
 
@@ -217,7 +312,7 @@ export default function SettleUpModal({
                     onChange={(event) => setToUserId(event.target.value)}
                   >
                     <option value="">Select receiver</option>
-                    {safeMembers.map((member) => (
+                    {safeMembers.filter((member) => member.id !== (currentUserId || "")).map((member) => (
                       <option key={member.id} value={member.id}>{member.name}</option>
                     ))}
                   </select>

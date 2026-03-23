@@ -146,13 +146,16 @@ export const authApi = {
 };
 
 export const meApi = {
-  fetchMe: () => api("/api/v1/me")
+  fetchMe: () => api("/api/v1/me"),
+  changePassword: (currentPassword, newPassword) =>
+    api("/api/v1/me/password", "POST", { currentPassword, newPassword })
 };
 
 export const groupsApi = {
   list: () => api("/api/v1/groups"),
   create: (name) => api("/api/v1/groups", "POST", { name }),
   delete: (groupId) => api(`/api/v1/groups/${groupId}`, "DELETE"),
+  leaveGroup: (groupId) => api(`/api/v1/groups/${groupId}/members/me`, "DELETE"),
   details: (groupId) => api(`/api/v1/groups/${groupId}/details`),
   createEqualExpense: (groupId, payload) => api(`/api/v1/groups/${groupId}/expenses/equal`, "POST", payload),
   deleteExpense: (groupId, expenseId) => api(`/api/v1/groups/${groupId}/expenses/${expenseId}`, "DELETE"),
@@ -160,6 +163,7 @@ export const groupsApi = {
   listSettlements: (groupId) => api(`/api/v1/groups/${groupId}/settlements`),
   createInvite: (groupId, email) => api(`/api/v1/groups/${groupId}/invites`, "POST", { email }),
   listGroupInvites: (groupId) => api(`/api/v1/groups/${groupId}/invites`),
+  cancelInviteById: (groupId, inviteId) => api(`/api/v1/groups/${groupId}/invites/by-id/${encodeURIComponent(inviteId)}`, "DELETE"),
   cancelInvite: (groupId, token) => api(`/api/v1/groups/${groupId}/invites/${encodeURIComponent(token)}`, "DELETE"),
   acceptInvite: (token) => api("/api/v1/invites/accept", "POST", { token })
 };
