@@ -4,11 +4,18 @@ import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatDate, formatMoney, initials } from "../utils/formatters";
 import { resolveGroupBalanceCents } from "../utils/groupBalance";
+import DashboardSentInviteCard from "./components/DashboardSentInviteCard";
 import ExpenseCardItem from "./components/ExpenseCardItem";
 import GroupDetailsHero from "./components/GroupDetailsHero";
 import MemberCardItem from "./components/MemberCardItem";
 import LeaveGroupModal from "./LeaveGroupModal";
 import SettleUpModal from "./SettleUpModal";
+
+const GROUP_MOBILE_SECTIONS = [
+  { id: "expenses", label: "Expenses" },
+  { id: "settled", label: "Settled" },
+  { id: "members", label: "Members" }
+];
 
 export default function GroupView({
   selectedGroupId,
@@ -31,7 +38,13 @@ export default function GroupView({
   recentSettlementId,
   listVariants,
   itemVariants,
+  sentInvites = [],
+  inviteResult,
   onBackToDashboard,
+  onCreateInvite,
+  onDeleteInvite,
+  onRefreshInvite,
+  onCreateMockFriendInvite,
   onOpenExpenseModal,
   onOpenSettleUpModal,
   onCloseSettleUpModal,
@@ -49,6 +62,10 @@ export default function GroupView({
   const { busy } = useAlerts();
   const showBalanceDiagnostics = false;
   const [collapsedSettlementIds, setCollapsedSettlementIds] = useState({});
+  const [inviteFriendName, setInviteFriendName] = useState("");
+  const [inviteFriendEmail, setInviteFriendEmail] = useState("");
+  const [mobileSection, setMobileSection] = useState("expenses");
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const activeExpenses = useMemo(() => {
     const hiddenIds = new Set();
     for (const expense of expenses || []) {
@@ -75,6 +92,10 @@ export default function GroupView({
       && !settledExpenseIdSet.has(expense.id)
     )),
     [activeExpenses, settledExpenseIdSet]
+  );
+  const groupSentInvites = useMemo(
+    () => (sentInvites || []).filter((invite) => invite.groupId === selectedGroupId),
+    [selectedGroupId, sentInvites]
   );
   const unsettledNetByUserId = useMemo(() => {
     const map = new Map();
@@ -154,6 +175,38 @@ export default function GroupView({
     setCollapsedSettlementIds((prev) => ({ ...prev, [settlementId]: !prev[settlementId] }));
   }
 
+  function clearInviteDraft() {
+    setInviteFriendName("");
+    setInviteFriendEmail("");
+  }
+
+  async function handleCreateGroupInvite(event) {
+    event.preventDefault();
+    const trimmedName = inviteFriendName.trim();
+    const trimmedEmail = inviteFriendEmail.trim();
+    if (!trimmedName || !trimmedEmail) return;
+
+    const createdInvite = await onCreateInvite({
+      name: trimmedName,
+      email: trimmedEmail
+    });
+    if (!createdInvite) return;
+
+    if (typeof onCreateMockFriendInvite === "function") {
+      onCreateMockFriendInvite({
+        name: trimmedName,
+        email: trimmedEmail,
+        groupName: detailsGroupInfo?.name || displayedGroup?.name || "Group"
+      });
+    }
+    clearInviteDraft();
+  }
+
+  function handleGroupAction(action) {
+    setMobileActionsOpen(false);
+    action();
+  }
+
   return (
     <section className="dash-wrap">
       <article className="card panel">
@@ -161,62 +214,77 @@ export default function GroupView({
           <button className="btn-ghost" type="button" onClick={onBackToDashboard}>
             Back to Dashboard
           </button>
-          <div className="dash-top-actions">
+          <div className="group-actions-shell">
+            <div className="group-action-primary">
+              <button
+                className="btn-primary"
+                type="button"
+                onClick={onOpenExpenseModal}
+                disabled={!selectedGroupId || groupLoading}
+              >
+                Add Expense
+              </button>
+              <button
+                className="btn-settle"
+                type="button"
+                onClick={onOpenSettleUpModal}
+                disabled={!selectedGroupId || groupLoading || expenseCount === 0}
+                title={expenseCount === 0 ? "No expenses to settle" : "Settle up payments"}
+              >
+                Settle Up
+              </button>
+            </div>
+
             <button
-              className="btn-primary"
               type="button"
-              onClick={onOpenExpenseModal}
-              disabled={!selectedGroupId || groupLoading}
+              className={`btn-ghost group-mobile-menu-trigger ${mobileActionsOpen ? "is-active" : ""}`.trim()}
+              aria-expanded={mobileActionsOpen}
+              aria-controls="groupActionMenu"
+              onClick={() => setMobileActionsOpen((prev) => !prev)}
             >
-              Add Expense
+              More
             </button>
-            <button
-              className="btn-settle"
-              type="button"
-              onClick={onOpenSettleUpModal}
-              disabled={!selectedGroupId || groupLoading || expenseCount === 0}
-              title={expenseCount === 0 ? "No expenses to settle" : "Settle up payments"}
-            >
-              Settle Up
-            </button>
-            <button
-              className="btn-secondary"
-              type="button"
-              onClick={onRefreshGroupDetail}
-              disabled={!selectedGroupId || groupLoading}
-            >
-              {groupLoading ? "Refreshing..." : "Refresh"}
-            </button>
-            <button
-              className="btn-danger"
-              type="button"
-              onClick={onDeleteGroup}
-              disabled={busy || groupLoading || !selectedGroupId || !isGroupOwner}
-              title={isGroupOwner ? "Delete this group" : "Only the group owner can delete this group"}
-            >
-              Delete Group
-            </button>
-            <button
-              className="btn-danger"
-              type="button"
-              onClick={onOpenLeaveGroupModal}
-              disabled={busy || groupLoading || !selectedGroupId || isGroupOwner}
-              title={isGroupOwner ? "Group owners cannot leave their group" : "Leave this group"}
-            >
-              Leave Group
-            </button>
-            <button className="btn-ghost" type="button" onClick={onLogout} disabled={busy}>
-              Logout
-            </button>
-            <button
-              className="top-user-avatar-btn"
-              type="button"
-              onClick={onBackToDashboard}
-              title={`Go to dashboard (${currentName || "User"})`}
-              aria-label={`Go to dashboard as ${currentName || "User"}`}
-            >
-              <span className="avatar top-user-avatar">{initials(currentName)}</span>
-            </button>
+
+            <div id="groupActionMenu" className={`group-action-secondary ${mobileActionsOpen ? "is-open" : ""}`.trim()}>
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={() => handleGroupAction(onRefreshGroupDetail)}
+                disabled={!selectedGroupId || groupLoading}
+              >
+                {groupLoading ? "Refreshing..." : "Refresh"}
+              </button>
+              <button
+                className="btn-danger"
+                type="button"
+                onClick={() => handleGroupAction(onDeleteGroup)}
+                disabled={busy || groupLoading || !selectedGroupId || !isGroupOwner}
+                title={isGroupOwner ? "Delete this group" : "Only the group owner can delete this group"}
+              >
+                Delete Group
+              </button>
+              <button
+                className="btn-danger"
+                type="button"
+                onClick={() => handleGroupAction(onOpenLeaveGroupModal)}
+                disabled={busy || groupLoading || !selectedGroupId || isGroupOwner}
+                title={isGroupOwner ? "Group owners cannot leave their group" : "Leave this group"}
+              >
+                Leave Group
+              </button>
+              <button className="btn-ghost" type="button" onClick={() => handleGroupAction(onLogout)} disabled={busy}>
+                Logout
+              </button>
+              <button
+                className="top-user-avatar-btn"
+                type="button"
+                onClick={() => handleGroupAction(onBackToDashboard)}
+                title={`Go to dashboard (${currentName || "User"})`}
+                aria-label={`Go to dashboard as ${currentName || "User"}`}
+              >
+                <span className="avatar top-user-avatar">{initials(currentName)}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -232,6 +300,22 @@ export default function GroupView({
           role={effectiveMyRole}
           isGroupOwner={isGroupOwner}
         />
+
+        {!groupLoading ? (
+          <nav className="group-mobile-sections" aria-label="Group detail sections">
+            {GROUP_MOBILE_SECTIONS.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                className={`group-mobile-section-tab ${mobileSection === section.id ? "is-active" : ""}`.trim()}
+                aria-pressed={mobileSection === section.id}
+                onClick={() => setMobileSection(section.id)}
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
+        ) : null}
 
         {showBalanceDiagnostics && balanceDiagnostics.rows.length ? (
           <section className={`group-diagnostics ${balanceDiagnostics.hasMismatch ? "has-mismatch" : "is-clean"}`.trim()}>
@@ -269,12 +353,18 @@ export default function GroupView({
         ) : (
           <div className="group-grid">
             <motion.article
-              className="card panel section-panel"
+              className={`card panel section-panel group-mobile-panel ${mobileSection === "members" ? "is-active" : ""}`.trim()}
+              data-mobile-panel="members"
               initial={{ opacity: 0, x: -14 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.25, delay: 0.06, ease: "easeOut" }}
             >
-              <h3>Members</h3>
+              <div className="group-members-panel-copy">
+                <h3>Group Members</h3>
+                <p className="friends-panel-subtitle">
+                  Members and pending invites now live together here so each group owns its own roster.
+                </p>
+              </div>
               {displayMembers.length ? (
                 <motion.ul
                   className="member-list"
@@ -301,14 +391,90 @@ export default function GroupView({
               ) : (
                 <p className="list-empty">No members found for this group yet.</p>
               )}
+
+              <div className="group-members-manage">
+                <div className="group-members-manage-head">
+                  <div>
+                    <h4>Add Someone</h4>
+                    <p className="friends-panel-subtitle">Keep it simple: name, email, invite.</p>
+                  </div>
+                </div>
+
+                <form className="group-invite-inline-form" onSubmit={handleCreateGroupInvite}>
+                  <div className="group-invite-inline-fields">
+                    <div className="field group-invite-inline-field">
+                      <label className="sr-only" htmlFor="groupInviteName">Name</label>
+                      <input
+                        id="groupInviteName"
+                        type="text"
+                        value={inviteFriendName}
+                        onChange={(event) => setInviteFriendName(event.target.value)}
+                        placeholder="Name"
+                        maxLength={120}
+                        required
+                      />
+                    </div>
+
+                    <div className="field group-invite-inline-field">
+                      <label className="sr-only" htmlFor="groupInviteEmail">Email</label>
+                      <input
+                        id="groupInviteEmail"
+                        type="email"
+                        value={inviteFriendEmail}
+                        onChange={(event) => setInviteFriendEmail(event.target.value)}
+                        placeholder="Email"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="group-invite-inline-actions">
+                    <button type="submit" className="btn-primary" disabled={busy}>
+                      Add person
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost group-invite-inline-clear"
+                      onClick={clearInviteDraft}
+                      disabled={busy || (!inviteFriendName && !inviteFriendEmail)}
+                      aria-label="Clear invite draft"
+                      title="Clear invite draft"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </form>
+
+                <div className="group-invite-list-wrap">
+                  <h4>Pending for this group</h4>
+                  <ul className="list dashboard-invite-list">
+                    {groupSentInvites.map((invite) => (
+                      <DashboardSentInviteCard
+                        key={invite.id}
+                        groupName={invite.groupName}
+                        recipientName={invite.recipientName}
+                        recipientEmail={invite.sentToEmail}
+                        expiresAt={invite.expiresAt}
+                        onDelete={() => onDeleteInvite(invite)}
+                        onRefresh={() => onRefreshInvite(invite)}
+                        highlighted={inviteResult?.token === invite.token}
+                      />
+                    ))}
+                    {!groupSentInvites.length ? (
+                      <li className="list-empty friend-empty-state">No pending invites for this group yet.</li>
+                    ) : null}
+                  </ul>
+                </div>
+              </div>
             </motion.article>
 
             <div className="group-stack">
               <motion.article
-                className="card panel section-panel"
+                className={`card panel section-panel group-mobile-panel ${mobileSection === "expenses" ? "is-active" : ""}`.trim()}
+                data-mobile-panel="expenses"
                 initial={{ opacity: 0, x: 14 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.25, delay: 0.1, ease: "easeOut" }}
+                transition={{ duration: 0.25, delay: 0.08, ease: "easeOut" }}
               >
                 <h3>Recent Expenses</h3>
                 {unsettledExpenses.length ? (
@@ -358,10 +524,11 @@ export default function GroupView({
               </motion.article>
 
               <motion.article
-                className="card panel section-panel"
+                className={`card panel section-panel group-mobile-panel ${mobileSection === "settled" ? "is-active" : ""}`.trim()}
+                data-mobile-panel="settled"
                 initial={{ opacity: 0, x: 14 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.25, delay: 0.12, ease: "easeOut" }}
+                transition={{ duration: 0.25, delay: 0.1, ease: "easeOut" }}
               >
                 <h3>Settled Expense Groups</h3>
                 {settledExpenseGroups.length ? (

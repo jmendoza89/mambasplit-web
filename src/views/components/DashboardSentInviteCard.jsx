@@ -12,6 +12,7 @@ function joinClasses(...classes) {
 
 export default function DashboardSentInviteCard({
   groupName,
+  recipientName,
   recipientEmail,
   expiresAt,
   onDelete,
@@ -22,6 +23,9 @@ export default function DashboardSentInviteCard({
   highlighted = false
 }) {
   const daysUntilExpire = getDaysUntilExpire(expiresAt);
+  const recipientLabel = recipientName && recipientEmail
+    ? `${recipientName} (${recipientEmail})`
+    : recipientName || recipientEmail || "-";
 
   return (
     <li
@@ -47,7 +51,7 @@ export default function DashboardSentInviteCard({
               </time>
             )}
           </div>
-          <p className="dashboard-sent-invite-to"><span className="sr-only">To:</span> {recipientEmail || "-"}</p>
+          <p className="dashboard-sent-invite-to"><span className="sr-only">To:</span> {recipientLabel}</p>
         </div>
 
         <div className="dashboard-sent-invite-actions">

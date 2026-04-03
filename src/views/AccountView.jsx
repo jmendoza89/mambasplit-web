@@ -39,12 +39,14 @@ export default function AccountView({
   const [editingField, setEditingField] = useState("");
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState(emptyPasswordForm);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
 
   useEffect(() => {
     setForm(baseProfile);
     setEditingField("");
     setIsEditingPassword(false);
     setPasswordForm(emptyPasswordForm());
+    setIsSubmittingPassword(false);
   }, [baseProfile]);
 
   const hasChanges = useMemo(() => (
@@ -97,11 +99,13 @@ export default function AccountView({
   function startPasswordEditing() {
     setIsEditingPassword(true);
     setPasswordForm(emptyPasswordForm());
+    setIsSubmittingPassword(false);
   }
 
   function cancelPasswordEditing() {
     setIsEditingPassword(false);
     setPasswordForm(emptyPasswordForm());
+    setIsSubmittingPassword(false);
   }
 
   async function handlePasswordSubmit(event) {
@@ -115,6 +119,7 @@ export default function AccountView({
     }
 
     try {
+      setIsSubmittingPassword(true);
       await onChangePassword({
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword
@@ -122,6 +127,8 @@ export default function AccountView({
       cancelPasswordEditing();
     } catch {
       // Global alert state already shows the error.
+    } finally {
+      setIsSubmittingPassword(false);
     }
   }
 
@@ -317,7 +324,7 @@ export default function AccountView({
                     type="submit"
                     className="btn-primary"
                     disabled={
-                      busy
+                      isSubmittingPassword
                       || passwordForm.newPassword.length < 8
                       || passwordForm.newPassword !== passwordForm.confirmPassword
                       || (!hasGoogleLogin && !passwordForm.currentPassword)
@@ -325,7 +332,7 @@ export default function AccountView({
                   >
                     Save Password
                   </button>
-                  <button type="button" className="btn-ghost" onClick={cancelPasswordEditing} disabled={busy}>
+                  <button type="button" className="btn-ghost" onClick={cancelPasswordEditing} disabled={isSubmittingPassword}>
                     Cancel
                   </button>
                 </div>

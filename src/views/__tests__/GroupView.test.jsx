@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { AlertContext } from "../../contexts/AlertContext";
 import { AuthContext } from "../../contexts/AuthContext";
 import GroupView from "../GroupView";
@@ -37,7 +37,13 @@ function renderView(overrideProps = {}) {
     recentSettlementId: null,
     listVariants: {},
     itemVariants: {},
+    sentInvites: [],
+    inviteResult: null,
     onBackToDashboard: vi.fn(),
+    onCreateInvite: vi.fn().mockResolvedValue({ id: "invite-1", token: "token-1" }),
+    onDeleteInvite: vi.fn(),
+    onRefreshInvite: vi.fn(),
+    onCreateMockFriendInvite: vi.fn(),
     onOpenExpenseModal: vi.fn(),
     onOpenSettleUpModal: vi.fn(),
     onCloseSettleUpModal: vi.fn(),
@@ -72,10 +78,13 @@ function renderView(overrideProps = {}) {
       </AlertContext.Provider>
     </AuthContext.Provider>
   );
+
+  return { props };
 }
 
 describe("GroupView", () => {
   afterEach(() => cleanup());
+
   it("uses the same mapped balance as the dashboard card for the group hero", () => {
     renderView();
 
@@ -86,8 +95,6 @@ describe("GroupView", () => {
 
   it("renders Leave Group button disabled for the group owner", () => {
     renderView({ isGroupOwner: true, effectiveMyRole: "OWNER" });
-    // Leave Group button has text content "Leave Group"
-    // The title provides tooltip but accessible name is the text
     const leaveBtn = screen.getByRole("button", { name: "Leave Group" });
     expect(leaveBtn).toBeDisabled();
   });
@@ -105,5 +112,85 @@ describe("GroupView", () => {
     renderView({ isGroupOwner: false, effectiveMyRole: "MEMBER", onOpenLeaveGroupModal });
     await user.click(screen.getByRole("button", { name: "Leave Group" }));
     expect(onOpenLeaveGroupModal).toHaveBeenCalledOnce();
+  });
+
+  it("submits the group invite form with name and email", async () => {
+    const userEvent = (await import("@testing-library/user-event")).default;
+    const user = userEvent.setup();
+    const onCreateInvite = vi.fn().mockResolvedValue({ id: "invite-1", token: "token-1" });
+    const onCreateMockFriendInvite = vi.fn();
+
+    renderView({ onCreateInvite, onCreateMockFriendInvite });
+
+    await user.type(screen.getByLabelText("Name"), "Doug Rosenberger");
+    await user.type(screen.getByLabelText("Email"), "doug@example.com");
+    await user.click(screen.getByRole("button", { name: "Add person" }));
+
+    expect(onCreateInvite).toHaveBeenCalledWith({
+      name: "Doug Rosenberger",
+      email: "doug@example.com"
+    });
+    expect(onCreateMockFriendInvite).toHaveBeenCalledWith({
+      name: "Doug Rosenberger",
+      email: "doug@example.com",
+      groupId: "group-1",
+      groupName: "Test1"
+    });
+  });
+
+  it("renders sent invites for the current group", () => {
+    renderView({
+      sentInvites: [{
+        id: "sent-1",
+        groupId: "group-1",
+        groupName: "Test1",
+        recipientName: "Friend Person",
+        sentToEmail: "friend@example.com",
+        token: "token-1",
+        expiresAt: "2026-03-30T00:00:00Z"
+      }]
+    });
+
+    expect(screen.getByText("Friend Person (friend@example.com)")).toBeInTheDocument();
+  });
+
+  it("switches the group mobile section panel when a section tab is pressed", () => {
+    renderView();
+
+    const expensesPanel = screen.getByText("Recent Expenses").closest(".group-mobile-panel");
+    const membersPanel = screen.getByText("Group Members").closest(".group-mobile-panel");
+
+    expect(expensesPanel).toHaveClass("is-active");
+    expect(membersPanel).not.toHaveClass("is-active");
+
+    fireEvent.click(screen.getByRole("button", { name: "Members" }));
+
+    expect(membersPanel).toHaveClass("is-active");
+    expect(expensesPanel).not.toHaveClass("is-active");
+  });
+
+  it("opens the compact mobile action menu from the more button", () => {
+    renderView();
+
+    const actionMenu = screen.getByRole("button", { name: "Refresh" }).closest(".group-action-secondary");
+    expect(actionMenu).not.toHaveClass("is-open");
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+
+    expect(actionMenu).toHaveClass("is-open");
+  });
+
+  it("toggles the collapsible group hero details", () => {
+    renderView();
+
+    const toggleButton = screen.getByRole("button", { name: "Show group stats" });
+    const heroDetails = toggleButton.nextElementSibling;
+    expect(heroDetails).not.toHaveClass("is-open");
+
+    fireEvent.click(toggleButton);
+    expect(heroDetails).toHaveClass("is-open");
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide group stats" }));
+    expect(heroDetails).not.toHaveClass("is-open");
   });
 });

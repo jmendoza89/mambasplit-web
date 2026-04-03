@@ -1,40 +1,37 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AlertContext } from "../../contexts/AlertContext";
 import { AuthContext } from "../../contexts/AuthContext";
 import DashboardView from "../DashboardView";
+import { initialFriendDirectory } from "../friendsMockData";
 
 function renderView(overrideProps = {}, contextOverrides = {}) {
   cleanup();
   const props = {
-    selectedGroupId: "",
-    groups: [],
+    selectedGroupId: "group-1",
+    groups: [{ id: "group-1", name: "Love Nest", createdBy: "user-1" }],
     newGroupName: "",
-    inviteEmail: "",
-    inviteResult: null,
-    sentInvites: [],
     pendingInvites: [],
     pendingInvitesLoading: false,
     pendingInvitesError: "",
     groupOwnershipById: {},
+    friendDirectory: initialFriendDirectory,
+    selectedFriendId: "friend-julio",
     onOpenGroupPage: vi.fn(),
     onOpenAccount: vi.fn(),
-    onCreateGroup: vi.fn((e) => e.preventDefault()),
-    onCreateInvite: vi.fn((e) => e.preventDefault()),
+    onSelectFriend: vi.fn(),
+    onCreateGroup: vi.fn((event) => event.preventDefault()),
     onAcceptPendingInvite: vi.fn(),
-    onDeleteInvite: vi.fn(),
-    onRefreshInvite: vi.fn(),
     onRefreshPendingInvites: vi.fn(),
     setSelectedGroupId: vi.fn(),
     setNewGroupName: vi.fn(),
-    setInviteEmail: vi.fn(),
     ...overrideProps
   };
 
   const authContextValue = {
     currentName: "User",
     currentEmail: "u@example.com",
-    currentId: "00000000-0000-4000-8000-000000000001",
+    currentId: "user-1",
     currentAvatarUrl: "",
     onLogout: vi.fn(),
     ...contextOverrides.auth
@@ -58,18 +55,60 @@ function renderView(overrideProps = {}, contextOverrides = {}) {
       </AlertContext.Provider>
     </AuthContext.Provider>
   );
-  
-  return { props, authContextValue, alertContextValue };
+
+  return { props };
 }
 
 describe("DashboardView", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-25T00:00:00Z"));
+    vi.setSystemTime(new Date("2026-03-20T00:00:00Z"));
   });
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("renders the pending friend detail state", () => {
+    renderView({ selectedFriendId: "friend-julio" });
+
+    const stage = screen.getByText("julio@mambatech.io").closest(".dashboard-friend-stage");
+    expect(within(stage).getByRole("heading", { name: "julio" })).toBeInTheDocument();
+    expect(within(stage).getByText("Invite pending")).toBeInTheDocument();
+    expect(within(stage).getByText("You have not added any expenses yet")).toBeInTheDocument();
+  });
+
+  it("renders the accepted friend detail state", () => {
+    renderView({ selectedFriendId: "friend-doug" });
+
+    const stage = screen.getByText("douros03@live.com").closest(".dashboard-friend-stage");
+    expect(within(stage).getByRole("heading", { name: "Doug Rosenberger" })).toBeInTheDocument();
+    expect(screen.getAllByText("Doug owes you $5.00").length).toBeGreaterThan(0);
+    expect(within(stage).getByText("Love Nest")).toBeInTheDocument();
+    expect(within(stage).getByRole("button", { name: "Show settled expenses" })).toBeInTheDocument();
+  });
+
+  it("calls onSelectFriend when a friend is clicked in the sidebar", () => {
+    const onSelectFriend = vi.fn();
+    renderView({ onSelectFriend });
+
+    fireEvent.click(screen.getByRole("button", { name: /Doug Rosenberger/i }));
+
+    expect(onSelectFriend).toHaveBeenCalledWith("friend-doug");
+  });
+
+  it("shows per-group balances and a net summary for Mina", () => {
+    renderView({ selectedFriendId: "friend-mina" });
+
+    const stage = screen.getByText("mina@example.com").closest(".dashboard-friend-stage");
+    expect(within(stage).getByText("Summer Euro Trip")).toBeInTheDocument();
+    expect(within(stage).getByText("Mina owes you $10.50")).toBeInTheDocument();
+    expect(within(stage).getByText("Lake House Weekend")).toBeInTheDocument();
+    expect(within(stage).getByText("You owe Mina $12.80")).toBeInTheDocument();
+
+    const balanceRail = screen.getByText("You owe Mina $2.30").closest(".dashboard-balance-rail");
+    expect(within(balanceRail).getByText("Summer Euro Trip")).toBeInTheDocument();
+    expect(within(balanceRail).getByText("Lake House Weekend")).toBeInTheDocument();
   });
 
   it("renders loading invite state", () => {
@@ -77,111 +116,17 @@ describe("DashboardView", () => {
     expect(screen.getByText("Loading pending invites...")).toBeInTheDocument();
   });
 
-  it("renders invite error state", () => {
-    renderView({ pendingInvitesLoading: false, pendingInvitesError: "Invite fetch failed" });
-    expect(screen.getByText("Invite fetch failed")).toBeInTheDocument();
-  });
-
-  it("renders empty invite state", () => {
-    renderView({ pendingInvitesLoading: false, pendingInvitesError: "", pendingInvites: [] });
-    expect(screen.getByText("No pending invites")).toBeInTheDocument();
-  });
-
-  it("renders empty sent invite state", () => {
-    renderView({ sentInvites: [] });
-    expect(screen.getByText("No sent invites")).toBeInTheDocument();
-  });
-
-  it("renders sent invite recipient from sentToEmail", () => {
-    renderView({
-      sentInvites: [{
-        id: "sent-legacy-1",
-        groupId: "group-1",
-        groupName: "Trip",
-        sentToEmail: "legacy@example.com",
-        token: "token-legacy-1",
-        expiresAt: "2026-03-01T00:00:00Z",
-        createdAt: "2026-02-25T00:00:00Z"
-      }]
-    });
-
-    expect(screen.getByText("legacy@example.com")).toBeInTheDocument();
-    // expiry is shown inline as a human-readable label (e.g. "4 days until expire") with full date in a tooltip
-    expect(screen.getAllByText("4 days until expire").length).toBeGreaterThan(0);
-  });
-
-  it("renders sent invite recipient from explicit invite fields without sender copy", () => {
-    renderView({
-      sentInvites: [{
-        id: "sent-1",
-        groupId: "group-1",
-        groupName: "Trip",
-        sentByDisplayName: "Owner",
-        sentByEmail: "owner@example.com",
-        sentToEmail: "friend@example.com",
-        expiresAt: "2026-03-01T00:00:00Z",
-        createdAt: "2026-02-25T00:00:00Z"
-      }]
-    });
-
-    expect(screen.getByText("friend@example.com")).toBeInTheDocument();
-    expect(screen.queryByText("From:")).not.toBeInTheDocument();
-    expect(screen.queryByText("Owner")).not.toBeInTheDocument();
-  });
-
-  it("renders pending invites and refresh action", async () => {
-    const onRefreshPendingInvites = vi.fn();
-    const onAcceptPendingInvite = vi.fn();
-    const onDeleteInvite = vi.fn();
-    const onRefreshInvite = vi.fn();
+  it("renders unknown sender fallback when pending invite sender details are unavailable", () => {
     renderView({
       pendingInvites: [{
         id: "invite-1",
         groupId: "group-1",
         groupName: "Trip",
-        sentToEmail: "u@example.com",
-        senderName: "Julio",
-        senderEmail: "julio@mambatech.io",
-        expiresAt: "2026-03-01T00:00:00Z",
-        createdAt: "2026-02-25T00:00:00Z"
-      }],
-      sentInvites: [{
-        id: "sent-1",
-        groupId: "group-1",
-        groupName: "Trip",
-        sentByDisplayName: "User",
-        sentByEmail: "u@example.com",
-        sentToEmail: "friend@example.com",
-        sentByUserId: "00000000-0000-4000-8000-000000000001",
-        token: "token-1",
-        expiresAt: "2026-03-01T00:00:00Z",
-        createdAt: "2026-02-25T00:00:00Z"
-      }],
-      onAcceptPendingInvite,
-      onRefreshPendingInvites,
-      onDeleteInvite,
-      onRefreshInvite
+        expiresAt: "2026-03-25T00:00:00Z"
+      }]
     });
 
-    expect(screen.getAllByText("Trip").length).toBeGreaterThan(0);
-    expect(screen.getByText("Julio")).toBeInTheDocument();
-    expect(screen.getByText("julio@mambatech.io")).toBeInTheDocument();
-    expect(screen.getByText("friend@example.com")).toBeInTheDocument();
-    expect(screen.getAllByText("4 days until expire").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getAllByRole("button", { name: "Refresh" })[0]);
-    const sentInviteCard = screen.getByText("friend@example.com").closest("li");
-    fireEvent.click(within(sentInviteCard).getByRole("button", { name: "Refresh" }));
-    expect(screen.getByRole("dialog", { name: "Refresh invite" })).toBeInTheDocument();
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Confirm Refresh" }));
-      await Promise.resolve();
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
-    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-    expect(onAcceptPendingInvite).toHaveBeenCalledTimes(1);
-    expect(onRefreshPendingInvites).toHaveBeenCalledTimes(1);
-    expect(onDeleteInvite).toHaveBeenCalledTimes(1);
-    expect(onRefreshInvite).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Unknown sender")).toBeInTheDocument();
   });
 
   it("opens the account dropdown and navigates to the account page", () => {
@@ -194,152 +139,49 @@ describe("DashboardView", () => {
     expect(onOpenAccount).toHaveBeenCalledTimes(1);
   });
 
-  it("does not render the last token section", () => {
-    renderView({
-      sentInvites: [{
-        id: "sent-1",
-        groupId: "group-1",
-        groupName: "Trip",
-        sentToEmail: "friend@example.com",
-        sentByUserId: "00000000-0000-4000-8000-000000000001",
-        token: "token-1",
-        expiresAt: "2026-03-01T00:00:00Z",
-        createdAt: "2026-02-25T00:00:00Z"
-      }],
-      inviteResult: {
-        token: "token-1",
-        sentToEmail: "friend@example.com",
-        expiresAt: "2026-03-01T00:00:00Z"
-      }
-    });
-
-    expect(screen.queryByText("Last Token:")).not.toBeInTheDocument();
-    expect(screen.getByText("friend@example.com")).toBeInTheDocument();
-  });
-
-  it("renders unknown sender fallback when pending invite sender details are unavailable", () => {
-    renderView({
-      pendingInvites: [{
-        id: "invite-1",
-        groupId: "group-1",
-        groupName: "Trip",
-        sentToEmail: "u@example.com",
-        expiresAt: "2026-03-01T00:00:00Z",
-        createdAt: "2026-02-25T00:00:00Z"
-      }]
-    });
-
-    expect(screen.getByText("Unknown sender")).toBeInTheDocument();
-    expect(screen.queryByText("u@example.com", { selector: ".dashboard-pending-invite-email" })).not.toBeInTheDocument();
-  });
-
-  it("disables delete when sender does not match current member", () => {
-    renderView({
-      sentInvites: [{
-        id: "sent-1",
-        groupId: "group-1",
-        groupName: "Trip",
-        sentToEmail: "friend@example.com",
-        sentByUserId: "00000000-0000-4000-8000-000000000002",
-        token: "token-1",
-        expiresAt: "2026-03-01T00:00:00Z",
-        createdAt: "2026-02-25T00:00:00Z"
-      }]
-    });
-
-    const deleteButton = screen.getByRole("button", { name: "Delete" });
-    const refreshButton = screen.getByText("friend@example.com").closest("li").querySelector(".dashboard-sent-invite-refresh");
-    expect(deleteButton).toBeDisabled();
-    expect(deleteButton).toHaveAttribute("title", "Only the member who sent this invite can delete it.");
-    expect(refreshButton).toBeDisabled();
-    expect(refreshButton).toHaveAttribute("title", "Only the member who sent this invite can refresh it.");
-  });
-
-  it("disables delete when sender is missing", () => {
-    renderView({
-      sentInvites: [{
-        id: "sent-1",
-        groupId: "group-1",
-        groupName: "Trip",
-        sentToEmail: "friend@example.com",
-        token: "token-1",
-        expiresAt: "2026-03-01T00:00:00Z",
-        createdAt: "2026-02-25T00:00:00Z"
-      }]
-    });
-
-    const deleteButton = screen.getByRole("button", { name: "Delete" });
-    const refreshButton = screen.getByText("friend@example.com").closest("li").querySelector(".dashboard-sent-invite-refresh");
-    expect(deleteButton).toBeDisabled();
-    expect(deleteButton).toHaveAttribute("title", "Invite sender is unavailable for this row.");
-    expect(refreshButton).toBeDisabled();
-    expect(refreshButton).toHaveAttribute("title", "Invite sender is unavailable for this row.");
-  });
-
-  it("disables delete when invite identifier is missing", () => {
-    renderView({
-      sentInvites: [{
-        id: "",
-        groupId: "group-1",
-        groupName: "Trip",
-        sentToEmail: "friend@example.com",
-        sentByUserId: "00000000-0000-4000-8000-000000000001",
-        expiresAt: "2026-03-01T00:00:00Z",
-        createdAt: "2026-02-25T00:00:00Z"
-      }]
-    });
-
-    const deleteButton = screen.getByRole("button", { name: "Delete" });
-    const refreshButton = screen.getByText("friend@example.com").closest("li").querySelector(".dashboard-sent-invite-refresh");
-    expect(deleteButton).toBeDisabled();
-    expect(deleteButton).toHaveAttribute("title", "Invite identifier is unavailable for this row.");
-    expect(refreshButton).toBeDisabled();
-    expect(refreshButton).toHaveAttribute("title", "Invite identifier is unavailable for this row.");
-  });
-
   it("shows owner crown only for owned groups", () => {
-    renderView(
-      {
-        groups: [
-          { id: "group-1", name: "Owned Group", createdBy: "user-1" },
-          { id: "group-2", name: "Joined Group", createdBy: "user-2" }
-        ]
-      },
-      {
-        auth: { currentId: "user-1" }
-      }
-    );
+    renderView({
+      groups: [
+        { id: "group-1", name: "Owned Group", createdBy: "user-1" },
+        { id: "group-2", name: "Joined Group", createdBy: "user-2" }
+      ]
+    });
 
     expect(screen.getAllByLabelText("Group owner")).toHaveLength(1);
   });
 
-  it("renders group balance summaries with owe/get-back messaging", () => {
-    renderView(
-      {
-        groups: [
-          { id: "group-1", name: "Trip", netBalanceCents: -300 },
-          { id: "group-2", name: "Dinner", netBalanceCents: 450 }
-        ]
-      }
-    );
+  it("switches the mobile section panel when a section tab is pressed", () => {
+    renderView({ selectedFriendId: "friend-doug" });
 
-    expect(screen.getByText("you owe $3.00")).toBeInTheDocument();
-    expect(screen.getByText("you get back $4.50")).toBeInTheDocument();
+    const sectionTabs = within(screen.getByRole("navigation", { name: "Dashboard sections" })).getAllByRole("button");
+    const friendStage = screen.getByText("douros03@live.com").closest(".dashboard-friend-stage");
+    const groupsPanel = screen.getByRole("heading", { name: "Groups" }).closest(".dashboard-mobile-panel");
+    const balanceRail = screen.getByText("Your balance").closest(".dashboard-balance-rail");
+
+    expect(sectionTabs[0]).toHaveTextContent("Groups");
+    expect(sectionTabs.map((tab) => tab.textContent)).toEqual(["Groups", "Balance", "Invites", "Friends"]);
+    expect(groupsPanel).toHaveClass("is-active");
+    expect(friendStage).not.toHaveClass("is-active");
+    expect(balanceRail).not.toHaveClass("is-active");
+
+    fireEvent.click(screen.getByRole("button", { name: "Balance" }));
+
+    expect(balanceRail).toHaveClass("is-active");
+    expect(groupsPanel).not.toHaveClass("is-active");
+    expect(friendStage).not.toHaveClass("is-active");
   });
 
-  it("treats role and ownership flags from api payload as owner", () => {
-    renderView(
-      {
-        groups: [
-          { id: "group-1", name: "Flag Owner", isOwner: true },
-          { id: "group-2", name: "Role Owner", userRole: "owner" }
-        ]
-      },
-      {
-        auth: { currentId: "user-1" }
-      }
-    );
+  it("keeps the selection flow inside the friends panel on mobile", () => {
+    const onSelectFriend = vi.fn();
+    renderView({ onSelectFriend });
 
-    expect(screen.getAllByLabelText("Group owner")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Friends" }));
+    fireEvent.click(screen.getByRole("button", { name: /Doug Rosenberger/i }));
+
+    const friendsPanel = screen.getByText("Find a friend").closest(".dashboard-mobile-panel");
+
+    expect(onSelectFriend).toHaveBeenCalledWith("friend-doug");
+    expect(friendsPanel).toHaveClass("is-active");
+    expect(screen.queryByRole("button", { name: "Friend" })).not.toBeInTheDocument();
   });
 });

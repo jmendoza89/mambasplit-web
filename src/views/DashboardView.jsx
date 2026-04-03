@@ -1,72 +1,15 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
+import { initials } from "../utils/formatters";
 import { isGroupOwner as checkGroupOwnership } from "../utils/groupOwnership";
 import { isUuid } from "../utils/validation";
 import DashboardEmptyState from "./components/DashboardEmptyState";
 import DashboardGroupCardItem from "./components/DashboardGroupCardItem";
 import DashboardHero from "./components/DashboardHero";
 import DashboardPendingInviteCard from "./components/DashboardPendingInviteCard";
-import DashboardSentInviteCard from "./components/DashboardSentInviteCard";
 import { groupService } from "../services/groupService";
-
-function RefreshInviteModal({ invite, busy, onCancel, onConfirm }) {
-  if (!invite) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        className="modal-overlay"
-        onClick={onCancel}
-        role="presentation"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <motion.section
-          className="modal-card dashboard-refresh-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="refreshInviteModalTitle"
-          onClick={(e) => e.stopPropagation()}
-          initial={{ opacity: 0, y: 10, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-        >
-          <div className="modal-header">
-            <div>
-              <h3 id="refreshInviteModalTitle">Refresh invite</h3>
-            </div>
-            <button
-              type="button"
-              className="modal-close"
-              onClick={onCancel}
-              aria-label="Close refresh invite dialog"
-            >
-              x
-            </button>
-          </div>
-
-          <div className="dashboard-refresh-modal-body">
-            <p>
-              Delete the current invite for <strong>{invite.sentToEmail ?? "-"}</strong> and resend a new one?
-            </p>
-            <div className="actions modal-actions dashboard-refresh-modal-actions">
-              <button type="button" className="btn-secondary" onClick={onCancel} disabled={busy}>
-                Cancel
-              </button>
-              <button type="button" className="btn-primary" onClick={onConfirm} disabled={busy}>
-                Confirm Refresh
-              </button>
-            </div>
-          </div>
-        </motion.section>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
 
 function DeclineInviteModal({ invite, busy, onCancel, onConfirm }) {
   if (!invite) return null;
@@ -86,7 +29,7 @@ function DeclineInviteModal({ invite, busy, onCancel, onConfirm }) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="declineInviteModalTitle"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
           initial={{ opacity: 0, y: 10, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 8, scale: 0.98 }}
@@ -125,70 +68,146 @@ function DeclineInviteModal({ invite, busy, onCancel, onConfirm }) {
   );
 }
 
+function friendBalanceTone(balanceCents) {
+  if (balanceCents > 0) return "positive";
+  if (balanceCents < 0) return "negative";
+  return "neutral";
+}
+
+function friendBalanceLabel(balanceCents) {
+  if (balanceCents > 0) return "Owes you";
+  if (balanceCents < 0) return "You owe";
+  return "Settled";
+}
+
+function expenseBalanceTone(expense, fallbackBalanceCents) {
+  if (expense?.tone) return expense.tone;
+  return friendBalanceTone(fallbackBalanceCents);
+}
+
+const MOBILE_SECTIONS = [
+  { id: "groups", label: "Groups" },
+  { id: "friends", label: "Friends" },
+];
+
+function FriendDetailContent({ activeFriend, groups, onOpenExpenseFromFriend }) {
+  if (!activeFriend) {
+    return (
+      <div className="dashboard-friend-empty">
+        <h3>No friends selected</h3>
+        <p>Choose someone from the list to see pending status and shared balances.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="dashboard-friend-stage-header">
+        <div className="dashboard-friend-stage-identity">
+          <div className="avatar dashboard-friend-stage-avatar" aria-hidden="true">{initials(activeFriend.name)}</div>
+          <div>
+            <div className="dashboard-friend-stage-name-row">
+              <h3>{activeFriend.name}</h3>
+              <span className={`dashboard-friend-stage-pill is-${activeFriend.status}`.trim()}>
+                {activeFriend.statusLabel}
+              </span>
+            </div>
+            <p>{activeFriend.email}</p>
+          </div>
+        </div>
+
+        <div className="dashboard-friend-stage-actions">
+          <button type="button" className="btn-primary" onClick={onOpenExpenseFromFriend} disabled={!groups.length}>
+            Add Expense
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={onOpenExpenseFromFriend}
+            disabled={!groups.length || activeFriend.balanceCents === 0}
+          >
+            Settle Up
+          </button>
+        </div>
+      </div>
+
+      {activeFriend.monthLabel ? (
+        <p className="dashboard-friend-stage-month">{activeFriend.monthLabel}</p>
+      ) : null}
+
+      {activeFriend.sharedExpenses.length ? (
+        <ul className="dashboard-friend-expense-list">
+          {activeFriend.sharedExpenses.map((expense) => (
+            <li key={expense.id} className="dashboard-friend-expense-card">
+              <div className="dashboard-friend-expense-date">{expense.dateLabel}</div>
+              <div className="dashboard-friend-expense-main">
+                <div className="dashboard-friend-expense-row">
+                  <strong>{expense.groupName}</strong>
+                  <span className={`dashboard-friend-expense-amount is-${expenseBalanceTone(expense, activeFriend.balanceCents)}`.trim()}>
+                    {expense.direction} {expense.amountText}
+                  </span>
+                </div>
+                <p>{expense.description}</p>
+                {expense.settledLinkLabel ? (
+                  <button type="button" className="btn-inline dashboard-link-button">
+                    {expense.settledLinkLabel}
+                  </button>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="dashboard-friend-empty">
+          <h3>{activeFriend.emptyTitle || "No shared expenses yet"}</h3>
+          <p>{activeFriend.emptyDetail || "Use Add Expense when you are ready to start tracking this person."}</p>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function DashboardView({
   selectedGroupId,
   groups,
   newGroupName,
-  inviteEmail,
-  inviteResult,
-  sentInvites,
   pendingInvites,
   pendingInvitesLoading,
   pendingInvitesError,
-  inviteCandidates = [],
-  inviteCandidatesLoading = false,
   groupOwnershipById = {},
+  friendDirectory = [],
+  selectedFriendId,
   onOpenGroupPage,
   onOpenAccount,
+  onSelectFriend,
   onCreateGroup,
-  onCreateInvite,
   onAcceptPendingInvite,
-  onDeleteInvite,
-  onRefreshInvite,
   onRefreshPendingInvites,
   setSelectedGroupId,
-  setNewGroupName,
-  setInviteEmail
+  setNewGroupName
 }) {
   const { currentName, currentEmail, currentId, currentAvatarUrl, onLogout } = useAuth();
   const { busy } = useAlerts();
-  const [invitePendingRefresh, setInvitePendingRefresh] = useState(null);
   const [invitePendingDecline, setInvitePendingDecline] = useState(null);
+  const [friendSearch, setFriendSearch] = useState("");
+  const [mobileSection, setMobileSection] = useState("groups");
 
-  function formatTimestamp(value) {
-    if (!value) return "-";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleString();
-  }
+  const activeFriend = useMemo(() => {
+    return friendDirectory.find((friend) => friend.id === selectedFriendId) || friendDirectory[0] || null;
+  }, [friendDirectory, selectedFriendId]);
+
+  const filteredFriends = useMemo(() => {
+    const query = friendSearch.trim().toLowerCase();
+    if (!query) return friendDirectory;
+
+    return friendDirectory.filter((friend) => {
+      const haystack = `${friend.name} ${friend.email}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [friendDirectory, friendSearch]);
 
   function isOwnedGroup(group) {
     return checkGroupOwnership(group, currentId, currentEmail, groupOwnershipById);
-  }
-
-  function canDeleteSentInvite(invite) {
-    return Boolean((invite?.id || invite?.token) && invite?.sentByUserId && invite.sentByUserId === currentId);
-  }
-
-  function deleteInviteActionTitle(invite) {
-    if (!invite?.sentByUserId) return "Invite sender is unavailable for this row.";
-    if (invite.sentByUserId !== currentId) return "Only the member who sent this invite can delete it.";
-    if (!invite?.id && !invite?.token) return "Invite identifier is unavailable for this row.";
-    return "Delete invite";
-  }
-
-  function refreshInviteActionTitle(invite) {
-    if (!invite?.sentByUserId) return "Invite sender is unavailable for this row.";
-    if (invite.sentByUserId !== currentId) return "Only the member who sent this invite can refresh it.";
-    if (!invite?.id && !invite?.token) return "Invite identifier is unavailable for this row.";
-    if (!invite?.sentToEmail) return "Invite recipient email is unavailable for this row.";
-    return "Refresh invite";
-  }
-
-  async function onConfirmRefreshInvite() {
-    if (!invitePendingRefresh) return;
-    await onRefreshInvite(invitePendingRefresh);
-    setInvitePendingRefresh(null);
   }
 
   async function onConfirmDeclineInvite() {
@@ -201,7 +220,6 @@ export default function DashboardView({
         await groupService.cancelInvite(invitePendingDecline.groupId, invitePendingDecline.token);
       }
       await onRefreshPendingInvites();
-      // lightweight feedback; controller alerts are preferred but not available here
       window.alert("Invite deleted.");
     } catch (err) {
       window.alert(err?.message || "Could not decline invite.");
@@ -210,223 +228,249 @@ export default function DashboardView({
     }
   }
 
-  function handleDecline(invite) {
-    setInvitePendingDecline(invite || null);
+  function onOpenExpenseFromFriend() {
+    if (selectedGroupId) {
+      onOpenGroupPage(selectedGroupId);
+      return;
+    }
+
+    if (groups[0]?.id) {
+      onOpenGroupPage(groups[0].id);
+    }
   }
+
+  const groupsPanel = (
+    <article
+      className={`card panel section-panel dashboard-sidebar-panel dashboard-mobile-panel ${mobileSection === "groups" ? "is-active" : ""}`}
+      data-mobile-panel="groups"
+    >
+      <h3>Groups</h3>
+      <form className="inline-form" onSubmit={onCreateGroup}>
+        <input
+          type="text"
+          placeholder="New group name"
+          value={newGroupName}
+          onChange={(event) => setNewGroupName(event.target.value)}
+          maxLength={200}
+          required
+        />
+        <button type="submit" className="btn-secondary" disabled={busy}>
+          Create
+        </button>
+      </form>
+      <ul className="list group-list">
+        {groups.map((group) => (
+          <DashboardGroupCardItem
+            key={group.id}
+            group={group}
+            isOwned={isOwnedGroup(group)}
+            isActive={group.id === selectedGroupId}
+            onSelect={setSelectedGroupId}
+            onOpen={onOpenGroupPage}
+          />
+        ))}
+        {!groups.length ? (
+          <DashboardEmptyState
+            as="li"
+            className="list-empty dashboard-empty-state-inline"
+            title="No groups yet. Create one to get started."
+            detail="Groups still live on the dashboard, just like they do now."
+            icon="+"
+          />
+        ) : null}
+      </ul>
+    </article>
+  );
+
+  const invitesPanel = (
+    <article
+      className={`card panel section-panel dashboard-sidebar-panel dashboard-mobile-panel ${mobileSection === "groups" ? "is-active" : ""}`}
+      data-mobile-panel="invites"
+    >
+      <div className="panel-header">
+        <h3>Group invites</h3>
+      </div>
+      {pendingInvitesLoading ? (
+        <DashboardEmptyState
+          as="div"
+          className="list-empty list-empty-inline dashboard-empty-state-inline"
+          title="Loading pending invites..."
+          detail="Checking for invites sent to your email."
+          icon="o"
+        />
+      ) : null}
+      {!pendingInvitesLoading && pendingInvitesError ? (
+        <DashboardEmptyState
+          as="div"
+          className="list-empty list-empty-inline dashboard-empty-state-inline"
+          title={pendingInvitesError}
+          detail="Try refreshing to fetch the latest pending invites."
+          icon="!"
+        />
+      ) : null}
+      {!pendingInvitesLoading && !pendingInvitesError ? (
+        <ul className="list dashboard-invite-list">
+          {pendingInvites.map((invite) => (
+            <DashboardPendingInviteCard
+              key={invite.id}
+              groupName={invite.groupName}
+              senderName={invite.senderName}
+              senderEmail={invite.senderEmail}
+              expiresAt={invite.expiresAt}
+              actionLabel="Accept"
+              onAction={() => onAcceptPendingInvite(invite.id)}
+              onDecline={() => setInvitePendingDecline(invite)}
+              actionDisabled={busy || pendingInvitesLoading}
+            />
+          ))}
+          {!pendingInvites.length ? (
+            <li className="list-empty friend-empty-state">No pending group invites.</li>
+          ) : null}
+        </ul>
+      ) : null}
+    </article>
+  );
 
   return (
     <section className="dash-wrap">
       <article className="card panel">
         <DashboardHero
           currentName={currentName}
-          currentEmail={currentEmail}
-          selectedGroupId={selectedGroupId}
-          busy={busy}
-          pendingInvitesLoading={pendingInvitesLoading}
-          onOpenGroupPage={onOpenGroupPage}
           onOpenAccount={onOpenAccount}
-          onRefreshPendingInvites={onRefreshPendingInvites}
           currentAvatarUrl={currentAvatarUrl}
           onLogout={onLogout}
+          busy={busy}
+          groupCount={groups.length}
+          friendCount={friendDirectory.length}
         />
 
-        <div className="workspace-grid">
-          <article className="card panel section-panel">
-            <h3>Groups</h3>
-            <form className="inline-form" onSubmit={onCreateGroup}>
+        <nav className="dashboard-mobile-sections" aria-label="Dashboard sections">
+          {MOBILE_SECTIONS.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              className={`dashboard-mobile-section-tab ${mobileSection === section.id ? "is-active" : ""}`.trim()}
+              aria-pressed={mobileSection === section.id}
+              onClick={() => setMobileSection(section.id)}
+            >
+              {section.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="dashboard-layout-b">
+          <aside className="dashboard-social-sidebar">
+            {groupsPanel}
+            {invitesPanel}
+          </aside>
+
+          <section
+            className={`card panel section-panel dashboard-layout-d-friends dashboard-mobile-panel ${mobileSection === "friends" ? "is-active" : ""}`}
+            data-mobile-panel="friends"
+          >
+            <div className="panel-header">
+              <div>
+                <h3>Friends</h3>
+                <p className="friends-panel-subtitle">Click a friend to see shared balances and expenses.</p>
+              </div>
+            </div>
+            <div className="friends-search-shell dashboard-friend-search">
+              <label htmlFor="dashboardFriendSearch">Find a friend</label>
               <input
+                id="dashboardFriendSearch"
                 type="text"
-                placeholder="New group name"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                maxLength={200}
-                required
+                placeholder="Search by name or email"
+                value={friendSearch}
+                onChange={(event) => setFriendSearch(event.target.value)}
               />
-              <button type="submit" className="btn-secondary" disabled={busy}>
-                Create Group
-              </button>
-            </form>
-
-            <ul className="list group-list">
-              {groups.map((group) => (
-                <DashboardGroupCardItem
-                  key={group.id}
-                  group={group}
-                  isOwned={isOwnedGroup(group)}
-                  isActive={group.id === selectedGroupId}
-                  onSelect={setSelectedGroupId}
-                  onOpen={onOpenGroupPage}
-                />
-              ))}
-              {!groups.length ? (
-                <DashboardEmptyState
-                  as="li"
-                  className="list-empty dashboard-empty-state-inline"
-                  title="No groups yet. Create one to start inviting."
-                  detail="Create your first group to begin tracking expenses and invites."
-                  icon="+"
-                />
+            </div>
+            <ul className="dashboard-friend-list" style={{ gap: 0 }}>
+              {filteredFriends.map((friend) => {
+                const isExpanded = friend.id === activeFriend?.id;
+                return (
+                  <li key={friend.id} className="dashboard-friend-accordion-item">
+                    <button
+                      type="button"
+                      className={`dashboard-friend-accordion-trigger ${isExpanded ? "is-active" : ""}`.trim()}
+                      onClick={() => onSelectFriend(friend.id)}
+                      aria-expanded={isExpanded}
+                    >
+                      <span className="avatar dashboard-friend-list-avatar" aria-hidden="true">{initials(friend.name)}</span>
+                      <span className="dashboard-friend-list-copy">
+                        <strong>{friend.name}</strong>
+                        <small>{friend.status === "pending" ? "Invite pending" : friendBalanceLabel(friend.balanceCents)}</small>
+                      </span>
+                      <span className={`dashboard-friend-status-badge is-${friend.status}`.trim()}>
+                        {friend.status === "pending" ? "Pending" : "Friend"}
+                      </span>
+                    </button>
+                    {isExpanded && (
+                      <motion.div
+                        className="dashboard-friend-accordion-body"
+                        key="body"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.18 }}
+                      >
+                        <div className="dashboard-friend-accordion-inner">
+                          <div className={`dashboard-friend-accordion-balance-strip is-${friendBalanceTone(activeFriend.balanceCents)}`}>
+                            <div>
+                              <strong className={`dashboard-friend-accordion-balance-amount is-${friendBalanceTone(activeFriend.balanceCents)}`}>{activeFriend.summary}</strong>
+                              <p>{activeFriend.note}</p>
+                            </div>
+                            {activeFriend.sharedGroups.length ? (
+                              <div className="dashboard-friend-accordion-groups">
+                                {activeFriend.sharedGroups.map((g) => <span key={g}>{g}</span>)}
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="dashboard-friend-accordion-actions">
+                            <button type="button" className="btn-primary" onClick={onOpenExpenseFromFriend} disabled={!groups.length}>
+                              Add Expense
+                            </button>
+                            <button type="button" className="btn-secondary" onClick={onOpenExpenseFromFriend} disabled={!groups.length || activeFriend.balanceCents === 0}>
+                              Settle Up
+                            </button>
+                          </div>
+                          {activeFriend.monthLabel ? (
+                            <p className="dashboard-friend-stage-month">{activeFriend.monthLabel}</p>
+                          ) : null}
+                          {activeFriend.sharedExpenses.length ? (
+                            <ul className="dashboard-friend-expense-list">
+                              {activeFriend.sharedExpenses.map((expense) => (
+                                <li key={expense.id} className="dashboard-friend-expense-card">
+                                  <div className="dashboard-friend-expense-date">{expense.dateLabel}</div>
+                                  <div className="dashboard-friend-expense-main">
+                                    <div className="dashboard-friend-expense-row">
+                                      <strong>{expense.groupName}</strong>
+                                      <span className={`dashboard-friend-expense-amount is-${expenseBalanceTone(expense, activeFriend.balanceCents)}`.trim()}>
+                                        {expense.direction} {expense.amountText}
+                                      </span>
+                                    </div>
+                                    <p>{expense.description}</p>
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="dashboard-friend-accordion-empty">{activeFriend.emptyTitle || "No shared expenses yet."}</p>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </li>
+                );
+              })}
+              {!filteredFriends.length ? (
+                <li className="list-empty friend-empty-state">No friends found.</li>
               ) : null}
             </ul>
-          </article>
-
-          <article className="card panel section-panel pending-invites-panel">
-            <div className="panel-header">
-              <h3>Pending Invites</h3>
-              <span className="panel-header-placeholder" aria-hidden="true" />
-            </div>
-
-            {pendingInvitesLoading ? (
-              <DashboardEmptyState
-                as="div"
-                className="list-empty list-empty-inline dashboard-empty-state-inline"
-                title="Loading pending invites..."
-                detail="Checking for invites sent to your email."
-                icon="o"
-              />
-            ) : null}
-
-            {!pendingInvitesLoading && pendingInvitesError ? (
-              <DashboardEmptyState
-                as="div"
-                className="list-empty list-empty-inline dashboard-empty-state-inline"
-                title={pendingInvitesError}
-                detail="Try refreshing to fetch the latest pending invites."
-                icon="!"
-              />
-            ) : null}
-
-            {!pendingInvitesLoading && !pendingInvitesError ? (
-              <ul className="list dashboard-invite-list">
-                {pendingInvites.map((invite) => (
-                  <DashboardPendingInviteCard
-                    key={invite.id}
-                    groupName={invite.groupName}
-                    senderName={invite.senderName}
-                    senderEmail={invite.senderEmail}
-                    createdAt={formatTimestamp(invite.createdAt)}
-                    expiresAt={formatTimestamp(invite.expiresAt)}
-                    actionLabel="Accept"
-                    onAction={() => onAcceptPendingInvite(invite.id)}
-                    onDecline={() => handleDecline(invite)}
-                    actionDisabled={busy || pendingInvitesLoading}
-                  />
-                ))}
-                {!pendingInvites.length ? (
-                  <DashboardEmptyState
-                    as="li"
-                    className="list-empty dashboard-empty-state-inline"
-                    title="No pending invites"
-                    detail="You are all caught up right now."
-                    icon="envelope"
-                  />
-                ) : null}
-              </ul>
-            ) : null}
-
-          </article>
-
-          <article className="card panel section-panel invites-panel">
-            <div className="panel-header">
-              <h3>Sent Invites</h3>
-              <span className="panel-header-placeholder" aria-hidden="true" />
-            </div>
-            <ul className="list dashboard-invite-list">
-              {sentInvites.map((invite) => (
-                <DashboardSentInviteCard
-                  key={invite.id}
-                  groupName={invite.groupName}
-                  recipientEmail={invite.sentToEmail}
-                  senderName={invite.sentByDisplayName ?? invite.senderName}
-                  senderEmail={invite.sentByEmail ?? invite.senderEmail}
-                  expiresAt={invite.expiresAt}
-                  onDelete={() => onDeleteInvite(invite)}
-                  onRefresh={() => setInvitePendingRefresh(invite)}
-                  actionDisabled={busy || !canDeleteSentInvite(invite)}
-                  deleteTitle={deleteInviteActionTitle(invite)}
-                  refreshTitle={refreshInviteActionTitle(invite)}
-                  highlighted={inviteResult?.token === invite.token}
-                />
-              ))}
-              {!sentInvites.length ? (
-                <DashboardEmptyState
-                  as="li"
-                  className="list-empty dashboard-empty-state-inline"
-                  title="No sent invites"
-                  detail="Create an invite to bring members into a group."
-                  icon="@"
-                />
-              ) : null}
-            </ul>
-          </article>
-
-          <article className="card panel section-panel create-invite-panel">
-            <h3>Create Invite</h3>
-            <form onSubmit={onCreateInvite}>
-              <div className="field">
-                <label htmlFor="groupSelect">Group</label>
-                <select
-                  id="groupSelect"
-                  value={selectedGroupId}
-                  onChange={(e) => setSelectedGroupId(e.target.value)}
-                  required
-                  disabled={!groups.length}
-                >
-                  {!groups.length ? <option value="">No groups available</option> : null}
-                  {groups.map((group) => (
-                    <option value={group.id} key={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="field">
-                <label htmlFor="inviteEmail">Invite Email</label>
-                <select
-                  id="inviteEmail"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  required
-                  disabled={!selectedGroupId || inviteCandidatesLoading || inviteCandidates.length === 0}
-                >
-                  {!selectedGroupId ? <option value="">Select a group first</option> : null}
-                  {selectedGroupId && inviteCandidatesLoading ? <option value="">Loading users...</option> : null}
-                  {selectedGroupId && !inviteCandidatesLoading && inviteCandidates.length === 0 ? (
-                    <option value="">No eligible users found</option>
-                  ) : null}
-                  {inviteCandidates.map((candidate) => (
-                    <option key={candidate.id || candidate.email} value={candidate.email}>
-                      {candidate.displayName} - {candidate.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="actions">
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={busy || !groups.length || !inviteEmail || inviteCandidatesLoading}
-                >
-                  Create Invite
-                </button>
-              </div>
-            </form>
-
-          </article>
+          </section>
         </div>
       </article>
 
       <AnimatePresence>
-        {invitePendingRefresh ? (
-          <RefreshInviteModal
-            invite={invitePendingRefresh}
-            busy={busy}
-            onCancel={() => setInvitePendingRefresh(null)}
-            onConfirm={onConfirmRefreshInvite}
-          />
-        ) : null}
         {invitePendingDecline ? (
           <DeclineInviteModal
             invite={invitePendingDecline}
