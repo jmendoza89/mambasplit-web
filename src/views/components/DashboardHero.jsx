@@ -29,7 +29,7 @@ export default function DashboardHero({
       <div className="dashboard-hero-head">
         <div className="dashboard-hero-balances">
           <div className="dashboard-hero-balance-box">
-            <span className="dashboard-hero-balance-label">You're Owed</span>
+            <span className="dashboard-hero-balance-label">You&apos;re Owed</span>
             <strong className="dashboard-hero-balance-value is-positive">{formatMoney((totalOwedCents || 0) / 100)}</strong>
           </div>
           <div className="dashboard-hero-balance-box">

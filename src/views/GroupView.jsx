@@ -57,7 +57,6 @@ export default function GroupView({
   onCreateSettlement,
   isSettleUpModalOpen,
   onDeleteExpense,
-  onRefreshGroupDetail,
   onDeleteGroup,
   isLeaveGroupModalOpen,
   onOpenLeaveGroupModal,

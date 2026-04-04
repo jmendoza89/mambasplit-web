@@ -254,17 +254,6 @@ export default function DashboardView({
     }
   }
 
-  function onOpenExpenseFromFriend() {
-    if (selectedGroupId) {
-      onOpenGroupPage(selectedGroupId);
-      return;
-    }
-
-    if (groups[0]?.id) {
-      onOpenGroupPage(groups[0].id);
-    }
-  }
-
   const groupsPanel = (
     <article
       className={`card panel section-panel dashboard-sidebar-panel dashboard-mobile-panel ${mobileSection === "groups" ? "is-active" : ""}`}
