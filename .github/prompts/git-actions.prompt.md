@@ -1,22 +1,8 @@
 ---
 name: git-actions
 description: "Workspace prompt for generating and reviewing all git branch/commit/PR actions. Uses the `risk-first-pr-reviewer` agent to prioritize risk and correctness."
-scope: workspace
-applyTo: "**"
 agent: feature-workflow-manager
-model: gpt-5-mini
-model_mapping:
-  review_short: gpt-4.1
-  review_detailed: gpt-4.1
-  review_*: gpt-4.1
-  default: gpt-5-mini
-inputs:
-  - name: action
-    description: "One of: branch_name, commit_message, commit_body, pr_title, pr_body, review_short, review_detailed"
-  - name: context
-    description: "Optional: diff, file list, changed code snippets, issue number, or PR link"
-outputs:
-  - description: "Single concise output per request (branch name string, commit message, PR title/body, or review report)."
+model: GPT-4.1 (copilot)
 ---
 
 Use when: you need a standardized, policy-compliant git artifact (branch name, commit message, PR title/body) or a risk-first review of a PR/diff.

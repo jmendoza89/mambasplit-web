@@ -1,7 +1,11 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import AccountView from "../AccountView";
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("AccountView", () => {
   it("renders account details as read only until edit is clicked", () => {
@@ -58,5 +62,27 @@ describe("AccountView", () => {
 
     expect(screen.queryByLabelText("Current password")).not.toBeInTheDocument();
     expect(screen.getByLabelText("New password")).toBeInTheDocument();
+  });
+
+  it("allows a Google-linked user to submit a new password even when the page is busy", () => {
+    render(
+      <AccountView
+        currentName="Google User"
+        currentEmail="google@example.com"
+        currentPhone=""
+        currentAvatarUrl=""
+        hasGoogleLogin
+        busy
+        onBackToDashboard={vi.fn()}
+        onSaveAccountProfile={vi.fn()}
+        onChangePassword={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Set Password" }));
+    fireEvent.change(screen.getByLabelText("New password"), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "password123" } });
+
+    expect(screen.getByRole("button", { name: "Save Password" })).toBeEnabled();
   });
 });

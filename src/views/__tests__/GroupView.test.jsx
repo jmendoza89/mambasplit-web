@@ -1,10 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { AlertContext } from "../../contexts/AlertContext";
 import { AuthContext } from "../../contexts/AuthContext";
 import GroupView from "../GroupView";
 
+function mockMatchMedia(matches = true) {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  });
+}
+
 function renderView(overrideProps = {}) {
+  const { __isMobile = true, ...viewOverrides } = overrideProps;
+  mockMatchMedia(__isMobile);
+
   const props = {
     selectedGroupId: "group-1",
     groupLoading: false,
@@ -37,7 +56,12 @@ function renderView(overrideProps = {}) {
     recentSettlementId: null,
     listVariants: {},
     itemVariants: {},
+    sentInvites: [],
+    inviteResult: null,
     onBackToDashboard: vi.fn(),
+    onCreateInvite: vi.fn().mockResolvedValue({ id: "invite-1", token: "token-1" }),
+    onDeleteInvite: vi.fn(),
+    onRefreshInvite: vi.fn(),
     onOpenExpenseModal: vi.fn(),
     onOpenSettleUpModal: vi.fn(),
     onCloseSettleUpModal: vi.fn(),
@@ -50,7 +74,7 @@ function renderView(overrideProps = {}) {
     onOpenLeaveGroupModal: vi.fn(),
     onCancelLeaveGroup: vi.fn(),
     onConfirmLeaveGroup: vi.fn(),
-    ...overrideProps
+    ...viewOverrides
   };
 
   render(
@@ -72,10 +96,13 @@ function renderView(overrideProps = {}) {
       </AlertContext.Provider>
     </AuthContext.Provider>
   );
+
+  return { props };
 }
 
 describe("GroupView", () => {
   afterEach(() => cleanup());
+
   it("uses the same mapped balance as the dashboard card for the group hero", () => {
     renderView();
 
@@ -84,17 +111,21 @@ describe("GroupView", () => {
     expect(screen.queryByText("You are settled up")).not.toBeInTheDocument();
   });
 
-  it("renders Leave Group button disabled for the group owner", () => {
+  it("renders Leave Group button disabled for the group owner", async () => {
+    const userEvent = (await import("@testing-library/user-event")).default;
+    const user = userEvent.setup();
     renderView({ isGroupOwner: true, effectiveMyRole: "OWNER" });
-    // Leave Group button has text content "Leave Group"
-    // The title provides tooltip but accessible name is the text
-    const leaveBtn = screen.getByRole("button", { name: "Leave Group" });
+    await user.click(screen.getByRole("button", { name: /Group actions for/i }));
+    const leaveBtn = screen.getByRole("menuitem", { name: "Leave Group" });
     expect(leaveBtn).toBeDisabled();
   });
 
-  it("renders Leave Group button enabled for a non-owner member", () => {
+  it("renders Leave Group button enabled for a non-owner member", async () => {
+    const userEvent = (await import("@testing-library/user-event")).default;
+    const user = userEvent.setup();
     renderView({ isGroupOwner: false, effectiveMyRole: "MEMBER" });
-    const leaveBtn = screen.getByRole("button", { name: "Leave Group" });
+    await user.click(screen.getByRole("button", { name: /Group actions for/i }));
+    const leaveBtn = screen.getByRole("menuitem", { name: "Leave Group" });
     expect(leaveBtn).not.toBeDisabled();
   });
 
@@ -103,7 +134,125 @@ describe("GroupView", () => {
     const user = userEvent.setup();
     const onOpenLeaveGroupModal = vi.fn();
     renderView({ isGroupOwner: false, effectiveMyRole: "MEMBER", onOpenLeaveGroupModal });
-    await user.click(screen.getByRole("button", { name: "Leave Group" }));
+    await user.click(screen.getByRole("button", { name: /Group actions for/i }));
+    await user.click(screen.getByRole("menuitem", { name: "Leave Group" }));
     expect(onOpenLeaveGroupModal).toHaveBeenCalledOnce();
+  });
+
+  it("submits the group invite form with name and email", async () => {
+    const userEvent = (await import("@testing-library/user-event")).default;
+    const user = userEvent.setup();
+    const onCreateInvite = vi.fn().mockResolvedValue({ id: "invite-1", token: "token-1" });
+
+    renderView({ onCreateInvite });
+
+    fireEvent.click(screen.getByRole("button", { name: "Invite" }));
+    await user.type(screen.getByLabelText("Name"), "Doug Rosenberger");
+    await user.type(screen.getByLabelText("Email"), "doug@example.com");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(onCreateInvite).toHaveBeenCalledWith({
+      name: "Doug Rosenberger",
+      email: "doug@example.com",
+      displayName: "Doug Rosenberger"
+    });
+  });
+
+  it("renders sent invites for the current group", () => {
+    renderView({
+      __isMobile: false,
+      sentInvites: [{
+        id: "sent-1",
+        groupId: "group-1",
+        groupName: "Test1",
+        recipientName: "Friend Person",
+        sentToEmail: "friend@example.com",
+        token: "token-1",
+        expiresAt: "2026-03-30T00:00:00Z"
+      }]
+    });
+
+    expect(screen.getByText("Friend Person (friend@example.com)")).toBeInTheDocument();
+  });
+
+  it("keeps invite section under members on desktop layout", () => {
+    renderView({ __isMobile: false });
+
+    expect(screen.getByText("Group Members")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+    expect(document.querySelector('[data-mobile-panel="invite"]')).not.toBeInTheDocument();
+  });
+
+  it("switches the group mobile section panel when a section tab is pressed", () => {
+    renderView();
+
+    const expensesPanel = screen.getByText("Recent Expenses").closest(".group-mobile-panel");
+    const membersPanel = screen.getByText("Group Members").closest(".group-mobile-panel");
+    const invitePanel = document.querySelector('[data-mobile-panel="invite"]');
+
+    // Members is now the default active panel
+    expect(membersPanel).toHaveClass("is-active");
+    expect(expensesPanel).not.toHaveClass("is-active");
+    expect(invitePanel).not.toHaveClass("is-active");
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+
+    expect(expensesPanel).toHaveClass("is-active");
+    expect(membersPanel).not.toHaveClass("is-active");
+    expect(invitePanel).not.toHaveClass("is-active");
+
+    fireEvent.click(screen.getByRole("button", { name: "Invite" }));
+
+    expect(invitePanel).toHaveClass("is-active");
+    expect(expensesPanel).not.toHaveClass("is-active");
+  });
+
+  it("hides settled expenses section in Expenses when there are no settled expenses", () => {
+    renderView({
+      expenses: [{
+        id: "expense-1",
+        description: "Lunch",
+        amountCents: 1200,
+        paidByUserId: "user-1",
+        payerUserId: "user-1",
+        settledByPayer: false,
+        splitType: "equally",
+        createdAt: "2026-03-16T00:00:00Z",
+        settlementId: null,
+        splits: [{ userId: "user-2", amountOwedCents: 1200 }]
+      }],
+      settlements: []
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+    expect(screen.queryByText("Settled Expense Groups")).not.toBeInTheDocument();
+  });
+
+  it("renders settled expenses section inside Expenses tab when settled groups exist", () => {
+    renderView({
+      expenses: [{
+        id: "expense-1",
+        description: "Dinner",
+        amountCents: 3200,
+        paidByUserId: "user-1",
+        payerUserId: "user-1",
+        settledByPayer: true,
+        splitType: "equally",
+        createdAt: "2026-03-16T00:00:00Z",
+        settlementId: "settlement-1",
+        splits: [{ userId: "user-2", amountOwedCents: 3200 }]
+      }],
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseIds: ["expense-1"]
+      }]
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+    expect(screen.getByText("Settled Expense Groups")).toBeInTheDocument();
   });
 });

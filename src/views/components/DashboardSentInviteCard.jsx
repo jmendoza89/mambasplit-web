@@ -12,6 +12,7 @@ function joinClasses(...classes) {
 
 export default function DashboardSentInviteCard({
   groupName,
+  recipientName,
   recipientEmail,
   expiresAt,
   onDelete,
@@ -22,6 +23,9 @@ export default function DashboardSentInviteCard({
   highlighted = false
 }) {
   const daysUntilExpire = getDaysUntilExpire(expiresAt);
+  const recipientLabel = recipientName && recipientEmail
+    ? `${recipientName} (${recipientEmail})`
+    : recipientName || recipientEmail || "-";
 
   return (
     <li
@@ -34,20 +38,18 @@ export default function DashboardSentInviteCard({
     >
       <div className="dashboard-sent-invite-head">
         <div className="dashboard-sent-invite-copy">
-          <div className="dashboard-sent-invite-group-row">
-            <strong className="dashboard-sent-invite-group">{groupName || "Group"}</strong>
-            {daysUntilExpire !== null && (
-              <time
-                className="dashboard-sent-invite-days"
-                data-tooltip={expiresAt ? new Date(expiresAt).toLocaleString() : ""}
-                dateTime={expiresAt || undefined}
-                aria-label={expiresAt ? `Expires at ${new Date(expiresAt).toLocaleString()}` : undefined}
-              >
-                {`${daysUntilExpire} days until expire`}
-              </time>
-            )}
-          </div>
-          <p className="dashboard-sent-invite-to"><span className="sr-only">To:</span> {recipientEmail || "-"}</p>
+          <strong className="dashboard-sent-invite-group">{groupName || "Group"}</strong>
+          {daysUntilExpire !== null && (
+            <time
+              className="dashboard-sent-invite-days"
+              data-tooltip={expiresAt ? new Date(expiresAt).toLocaleString() : ""}
+              dateTime={expiresAt || undefined}
+              aria-label={expiresAt ? `Expires at ${new Date(expiresAt).toLocaleString()}` : undefined}
+            >
+              {`${daysUntilExpire} days until expire`}
+            </time>
+          )}
+          <p className="dashboard-sent-invite-to"><span className="sr-only">To:</span> {recipientLabel}</p>
         </div>
 
         <div className="dashboard-sent-invite-actions">

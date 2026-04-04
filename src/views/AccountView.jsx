@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { initials } from "../utils/formatters";
 
-const EDITABLE_FIELDS = ["displayName", "email", "phone", "avatar"];
+const EDITABLE_FIELDS = ["displayName", "email"];
 
-function createProfileState({ currentName, currentEmail, currentPhone, currentAvatarUrl }) {
+function createProfileState({ currentName, currentEmail }) {
   return {
     displayName: currentName || "",
-    email: currentEmail === "-" ? "" : currentEmail || "",
-    phone: currentPhone || "",
-    avatarUrl: currentAvatarUrl || ""
+    email: currentEmail === "-" ? "" : currentEmail || ""
   };
 }
 
@@ -23,8 +20,6 @@ function emptyPasswordForm() {
 export default function AccountView({
   currentName,
   currentEmail,
-  currentPhone,
-  currentAvatarUrl,
   hasGoogleLogin,
   busy,
   onBackToDashboard,
@@ -32,45 +27,31 @@ export default function AccountView({
   onChangePassword
 }) {
   const baseProfile = useMemo(
-    () => createProfileState({ currentName, currentEmail, currentPhone, currentAvatarUrl }),
-    [currentName, currentEmail, currentPhone, currentAvatarUrl]
+    () => createProfileState({ currentName, currentEmail }),
+    [currentName, currentEmail]
   );
   const [form, setForm] = useState(baseProfile);
   const [editingField, setEditingField] = useState("");
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState(emptyPasswordForm);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
 
   useEffect(() => {
     setForm(baseProfile);
     setEditingField("");
     setIsEditingPassword(false);
     setPasswordForm(emptyPasswordForm());
+    setIsSubmittingPassword(false);
   }, [baseProfile]);
 
   const hasChanges = useMemo(() => (
     form.displayName !== baseProfile.displayName
     || form.email !== baseProfile.email
-    || form.phone !== baseProfile.phone
-    || form.avatarUrl !== baseProfile.avatarUrl
   ), [form, baseProfile]);
 
   function handleFieldChange(event) {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-  }
-
-  function handleAvatarChange(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setForm((prev) => ({
-        ...prev,
-        avatarUrl: typeof reader.result === "string" ? reader.result : prev.avatarUrl
-      }));
-    };
-    reader.readAsDataURL(file);
   }
 
   function startEditing(fieldName) {
@@ -97,11 +78,13 @@ export default function AccountView({
   function startPasswordEditing() {
     setIsEditingPassword(true);
     setPasswordForm(emptyPasswordForm());
+    setIsSubmittingPassword(false);
   }
 
   function cancelPasswordEditing() {
     setIsEditingPassword(false);
     setPasswordForm(emptyPasswordForm());
+    setIsSubmittingPassword(false);
   }
 
   async function handlePasswordSubmit(event) {
@@ -115,6 +98,7 @@ export default function AccountView({
     }
 
     try {
+      setIsSubmittingPassword(true);
       await onChangePassword({
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword
@@ -122,6 +106,8 @@ export default function AccountView({
       cancelPasswordEditing();
     } catch {
       // Global alert state already shows the error.
+    } finally {
+      setIsSubmittingPassword(false);
     }
   }
 
@@ -147,7 +133,7 @@ export default function AccountView({
             value={value}
             onChange={handleFieldChange}
             placeholder={placeholder}
-            required={field !== "phone"}
+            required
             autoFocus
           />
         ) : (
@@ -157,7 +143,6 @@ export default function AccountView({
     );
   }
 
-  const isEditingAvatar = editingField === "avatar";
   const summaryName = form.displayName || currentName || "Your profile";
   const summaryEmail = form.email || currentEmail || "Add an email address";
 
@@ -178,31 +163,6 @@ export default function AccountView({
         </div>
 
         <form className="account-layout" onSubmit={handleSubmit}>
-          <section className="account-avatar-panel">
-            {form.avatarUrl ? (
-              <img className="account-avatar-image" src={form.avatarUrl} alt={`${form.displayName || "User"} avatar`} />
-            ) : (
-              <div className="account-avatar-fallback" aria-hidden="true">{initials(form.displayName || currentName)}</div>
-            )}
-
-            <div className="account-info-head">
-              <label className="account-file-label" htmlFor="accountAvatar">
-                Change your avatar
-              </label>
-              {!isEditingAvatar ? (
-                <button type="button" className="account-inline-edit" onClick={() => startEditing("avatar")}>
-                  Edit
-                </button>
-              ) : null}
-            </div>
-
-            {isEditingAvatar ? (
-              <input id="accountAvatar" type="file" accept="image/*" onChange={handleAvatarChange} />
-            ) : (
-              <p className="account-avatar-note">Click edit to choose a new profile photo.</p>
-            )}
-          </section>
-
           <section className="account-fields">
             <div className="account-summary-card">
               <p className="account-summary-label">Profile overview</p>
@@ -221,14 +181,6 @@ export default function AccountView({
               label: "Your email address",
               value: form.email,
               type: "email"
-            })}
-
-            {renderEditableRow({
-              field: "phone",
-              label: "Your phone number",
-              value: form.phone,
-              type: "tel",
-              placeholder: "Add a phone number"
             })}
 
             {editingField ? (
@@ -317,7 +269,7 @@ export default function AccountView({
                     type="submit"
                     className="btn-primary"
                     disabled={
-                      busy
+                      isSubmittingPassword
                       || passwordForm.newPassword.length < 8
                       || passwordForm.newPassword !== passwordForm.confirmPassword
                       || (!hasGoogleLogin && !passwordForm.currentPassword)
@@ -325,7 +277,7 @@ export default function AccountView({
                   >
                     Save Password
                   </button>
-                  <button type="button" className="btn-ghost" onClick={cancelPasswordEditing} disabled={busy}>
+                  <button type="button" className="btn-ghost" onClick={cancelPasswordEditing} disabled={isSubmittingPassword}>
                     Cancel
                   </button>
                 </div>
