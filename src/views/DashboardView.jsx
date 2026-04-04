@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
-import { initials } from "../utils/formatters";
+import { formatMoney, initials } from "../utils/formatters";
 import { isGroupOwner as checkGroupOwnership } from "../utils/groupOwnership";
 import { isUuid } from "../utils/validation";
 import { friendService } from "../services/friendService";
@@ -75,6 +75,73 @@ function balanceTone(netBalanceCents) {
   return "neutral";
 }
 
+function friendBalanceLabel(displayName, netBalanceCents) {
+  const amount = formatMoney(Math.abs(netBalanceCents || 0) / 100);
+  if (netBalanceCents > 0) return `${displayName} owes you ${amount}`;
+  if (netBalanceCents < 0) return `You owe ${displayName} ${amount}`;
+  return "All settled";
+}
+
+function sharedGroupsNetCents(sharedGroups) {
+  if (!Array.isArray(sharedGroups)) return null;
+  const numericBalances = sharedGroups
+    .map((sharedGroup) => sharedGroup?.balanceCents)
+    .filter((balanceCents) => typeof balanceCents === "number");
+  if (!numericBalances.length) {
+    return sharedGroups.length === 0 ? 0 : null;
+  }
+  return numericBalances.reduce((sum, balanceCents) => sum + balanceCents, 0);
+}
+
+function resolveFriendSummary(friend, detail) {
+  const displayName = detail?.displayName || friend?.displayName || "Friend";
+  const listCents = typeof friend?.netBalanceCents === "number" ? friend.netBalanceCents : null;
+  const detailCents = typeof detail?.netBalanceCents === "number" ? detail.netBalanceCents : null;
+  const rollupCents = sharedGroupsNetCents(detail?.sharedGroups);
+  const detailLabel = String(detail?.netBalanceLabel || detail?.summary || "").trim();
+  const listLabel = String(friend?.netBalanceLabel || "").trim();
+
+  let netBalanceCents = listCents ?? 0;
+  let netBalanceLabel = listLabel || friendBalanceLabel(displayName, netBalanceCents);
+
+  if (!detail) {
+    return {
+      netBalanceCents,
+      netBalanceLabel
+    };
+  }
+
+  const hasRollupCents = typeof rollupCents === "number";
+  const hasDetailCents = typeof detailCents === "number";
+
+  if (hasRollupCents && hasDetailCents && rollupCents !== detailCents) {
+    netBalanceCents = rollupCents;
+    netBalanceLabel = friendBalanceLabel(displayName, rollupCents);
+    return { netBalanceCents, netBalanceLabel };
+  }
+
+  if (hasDetailCents) {
+    netBalanceCents = detailCents;
+    netBalanceLabel = detailLabel || friendBalanceLabel(displayName, detailCents);
+    return { netBalanceCents, netBalanceLabel };
+  }
+
+  if (hasRollupCents) {
+    netBalanceCents = rollupCents;
+    netBalanceLabel = friendBalanceLabel(displayName, rollupCents);
+    return { netBalanceCents, netBalanceLabel };
+  }
+
+  if (detailLabel) {
+    netBalanceLabel = detailLabel;
+  }
+
+  return {
+    netBalanceCents,
+    netBalanceLabel
+  };
+}
+
 const MOBILE_SECTIONS = [
   { id: "groups", label: "Groups" },
   { id: "friends", label: "Friends" },
@@ -112,6 +179,13 @@ export default function DashboardView({
   const activeFriend = useMemo(() => {
     return friendDirectory.find((friend) => friend.id === selectedFriendId) || friendDirectory[0] || null;
   }, [friendDirectory, selectedFriendId]);
+  const activeFriendSummary = useMemo(() => resolveFriendSummary(activeFriend, friendDetail), [activeFriend, friendDetail]);
+  const activeFriendSharedGroupCount = useMemo(() => {
+    if (Array.isArray(friendDetail?.sharedGroups)) {
+      return friendDetail.sharedGroups.length;
+    }
+    return activeFriend?.sharedGroupCount || 0;
+  }, [activeFriend?.sharedGroupCount, friendDetail?.sharedGroups]);
 
   const filteredFriends = useMemo(() => {
     const query = friendSearch.trim().toLowerCase();
@@ -356,6 +430,9 @@ export default function DashboardView({
                 </li>
               ) : filteredFriends.map((friend) => {
                 const isExpanded = friend.id === activeFriend?.id;
+                const rowSummary = isExpanded
+                  ? activeFriendSummary
+                  : resolveFriendSummary(friend, null);
                 return (
                   <li key={friend.id} className="dashboard-friend-accordion-item">
                     <button
@@ -367,7 +444,7 @@ export default function DashboardView({
                       <span className="avatar dashboard-friend-list-avatar" aria-hidden="true">{initials(friend.displayName)}</span>
                       <span className="dashboard-friend-list-copy">
                         <strong>{friend.displayName}</strong>
-                        <small>{friend.status === "Pending" ? "Invite pending" : (friend.netBalanceLabel || "Friend")}</small>
+                        <small>{friend.status === "Pending" ? "Invite pending" : (rowSummary.netBalanceLabel || "Friend")}</small>
                       </span>
                       <span className={`dashboard-friend-status-badge is-${friend.status.toLowerCase()}`.trim()}>
                         {friend.status === "Connected" ? "Friend" : "Pending"}
@@ -383,13 +460,13 @@ export default function DashboardView({
                         transition={{ duration: 0.18 }}
                       >
                         <div className="dashboard-friend-accordion-inner">
-                          <div className={`dashboard-friend-accordion-balance-strip is-${balanceTone(activeFriend.netBalanceCents)}`}>
-                            <strong className={`dashboard-friend-accordion-balance-amount is-${balanceTone(activeFriend.netBalanceCents)}`}>
-                              {activeFriend.netBalanceLabel}
+                          <div className={`dashboard-friend-accordion-balance-strip is-${balanceTone(activeFriendSummary.netBalanceCents)}`}>
+                            <strong className={`dashboard-friend-accordion-balance-amount is-${balanceTone(activeFriendSummary.netBalanceCents)}`}>
+                              {activeFriendSummary.netBalanceLabel}
                             </strong>
-                            {activeFriend.sharedGroupCount ? (
+                            {activeFriendSharedGroupCount ? (
                               <span className="dashboard-friend-accordion-groups-count">
-                                {activeFriend.sharedGroupCount} shared group{activeFriend.sharedGroupCount === 1 ? "" : "s"}
+                                {activeFriendSharedGroupCount} shared group{activeFriendSharedGroupCount === 1 ? "" : "s"}
                               </span>
                             ) : null}
                           </div>

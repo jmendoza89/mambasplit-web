@@ -330,12 +330,60 @@ describe("DashboardView", () => {
     expect(friendsPanel).toHaveClass("is-active");
   });
 
-  it("does not display friendBalanceLabel derived text — uses API-provided netBalanceLabel", () => {
-    renderView({ selectedFriendId: "fc-doug" });
+  it("re-hydrates stale list summary from shared-group net when selected", async () => {
+    const friendDirectory = [
+      {
+        id: "fc-julio",
+        displayName: "Julio C. Mendoza",
+        email: "julio@example.com",
+        status: "Connected",
+        friendUserId: "user-julio",
+        netBalanceCents: -5250,
+        netBalanceLabel: "You owe Julio C. Mendoza $52.50",
+        sharedGroupCount: 2,
+        hasActiveSharedBalances: true,
+        lastUsedAtUtc: "2026-04-01T00:00:00Z"
+      }
+    ];
 
-    // Trigger subtitle should use API-provided label, not "Owes you" derived string
-    const trigger = screen.getByRole("button", { name: /Doug Rosenberger/i });
-    expect(within(trigger).getByText("Doug owes you $5.00")).toBeInTheDocument();
-    expect(within(trigger).queryByText("Owes you")).not.toBeInTheDocument();
+    friendService.detail.mockResolvedValueOnce({
+      id: "fc-julio",
+      displayName: "Julio C. Mendoza",
+      email: "julio@example.com",
+      status: "Connected",
+      friendUserId: "user-julio",
+      sharedGroups: [
+        {
+          groupId: "group-1",
+          groupName: "LaTienda",
+          balanceCents: -5250,
+          balanceLabel: "You owe $52.50",
+          hasUnsettledExpenses: true
+        },
+        {
+          groupId: "group-2",
+          groupName: "NewTest",
+          balanceCents: 12000,
+          balanceLabel: "They owe you $120.00",
+          hasUnsettledExpenses: true
+        }
+      ]
+    });
+
+    renderView({
+      groups: [
+        { id: "group-1", name: "LaTienda", createdBy: "user-1" },
+        { id: "group-2", name: "NewTest", createdBy: "user-1" }
+      ],
+      friendDirectory,
+      selectedFriendId: "fc-julio"
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Julio C. Mendoza owes you $67.50").length).toBeGreaterThan(0);
+    });
+
+    expect(screen.queryByText("You owe Julio C. Mendoza $52.50")).not.toBeInTheDocument();
   });
 });
+
