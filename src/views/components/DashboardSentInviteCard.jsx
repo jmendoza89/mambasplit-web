@@ -38,19 +38,17 @@ export default function DashboardSentInviteCard({
     >
       <div className="dashboard-sent-invite-head">
         <div className="dashboard-sent-invite-copy">
-          <div className="dashboard-sent-invite-group-row">
-            <strong className="dashboard-sent-invite-group">{groupName || "Group"}</strong>
-            {daysUntilExpire !== null && (
-              <time
-                className="dashboard-sent-invite-days"
-                data-tooltip={expiresAt ? new Date(expiresAt).toLocaleString() : ""}
-                dateTime={expiresAt || undefined}
-                aria-label={expiresAt ? `Expires at ${new Date(expiresAt).toLocaleString()}` : undefined}
-              >
-                {`${daysUntilExpire} days until expire`}
-              </time>
-            )}
-          </div>
+          <strong className="dashboard-sent-invite-group">{groupName || "Group"}</strong>
+          {daysUntilExpire !== null && (
+            <time
+              className="dashboard-sent-invite-days"
+              data-tooltip={expiresAt ? new Date(expiresAt).toLocaleString() : ""}
+              dateTime={expiresAt || undefined}
+              aria-label={expiresAt ? `Expires at ${new Date(expiresAt).toLocaleString()}` : undefined}
+            >
+              {`${daysUntilExpire} days until expire`}
+            </time>
+          )}
           <p className="dashboard-sent-invite-to"><span className="sr-only">To:</span> {recipientLabel}</p>
         </div>
 

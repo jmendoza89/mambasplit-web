@@ -1736,24 +1736,24 @@ button:disabled {
 }
 
 .dashboard-sent-invite-copy {
+  flex: 1;
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .dashboard-sent-invite-group-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 2px 8px;
 }
 
 .dashboard-sent-invite-days {
   color: #6a8b98;
   font-size: 0.88rem;
   font-weight: 700;
-  min-width: 40px;
-  text-align: right;
+  white-space: nowrap;
 }
 
 .dashboard-sent-invite-days {
@@ -1818,7 +1818,9 @@ button:disabled {
   color: #2f6070;
   font-size: 1rem;
   font-weight: 600;
-  line-break: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dashboard-pending-invite-email {
@@ -1826,7 +1828,9 @@ button:disabled {
   color: rgba(47, 96, 112, 0.82);
   font-size: 0.92rem;
   font-weight: 400;
-  line-break: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dashboard-sent-invite-to {
@@ -1834,7 +1838,9 @@ button:disabled {
   color: #2f6070;
   font-size: 0.96rem;
   font-weight: 500;
-  line-break: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Utility: visually hidden but available to screen readers and DOM (sr-only) */
@@ -3619,6 +3625,17 @@ button:disabled {
   font-size: 0.96rem;
 }
 
+/* In the narrow members sidebar, always stack invite action buttons */
+.group-members-manage .dashboard-sent-invite-actions {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.group-members-manage .dashboard-sent-invite-actions .btn-inline {
+  text-align: center;
+  margin-right: 0;
+}
+
 .friends-overview-panel {
   grid-column: 1 / -1;
 }
@@ -4351,7 +4368,7 @@ button:disabled {
 
   .dashboard-hero-head {
     flex-direction: row;
-    align-items: stretch;
+    align-items: center;
     gap: 8px;
   }
 
@@ -4386,11 +4403,37 @@ button:disabled {
   }
 
   .dashboard-hero-actions {
-    width: auto;
-    flex-shrink: 0;
+    width: 40px;
+    flex: 0 0 40px;
     flex-wrap: nowrap;
     display: flex;
-    align-items: stretch;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .account-menu-name {
+    display: none;
+  }
+
+  .account-menu {
+    display: flex;
+  }
+
+  .btn-hero-action.account-menu-trigger {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 4px;
+    gap: 0;
+    justify-content: center;
+    border-radius: 999px;
+  }
+
+  .dashboard-hero-avatar,
+  .account-menu-avatar-image {
+    width: 32px;
+    height: 32px;
   }
 
   .btn-hero-action {
@@ -4853,21 +4896,40 @@ button:disabled {
   }
 
   /* Group avatar pill: compact on mobile */
+  .group-avatar-menu {
+    display: flex;
+    align-items: center;
+    align-self: center;
+  }
+
+  .group-page-top .group-avatar-pill,
   .group-avatar-pill {
-    padding: 4px 10px 4px 4px;
-    min-height: 36px;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    flex: 0 0 44px;
+    padding: 6px;
     font-size: 0.82rem;
-    gap: 6px;
+    gap: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
   }
 
   .group-avatar-pill .top-user-avatar {
-    width: 26px;
-    height: 26px;
-    font-size: 0.76rem;
+    width: 30px;
+    height: 30px;
+    font-size: 0.82rem;
   }
 
   .group-avatar-pill-name {
-    max-width: 80px;
+    display: none;
   }
 
   .friends-preview-cta,
@@ -4928,5 +4990,18 @@ button:disabled {
   .group-diagnostics-row {
     grid-template-columns: 1fr 1fr;
     row-gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Stack invite action buttons on very small screens (dashboard view) */
+  .dashboard-sent-invite-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard-sent-invite-actions .btn-inline {
+    text-align: center;
+    margin-right: 0;
   }
 }

@@ -1,9 +1,82 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AlertContext } from "../../contexts/AlertContext";
 import { AuthContext } from "../../contexts/AuthContext";
 import DashboardView from "../DashboardView";
-import { initialFriendDirectory } from "../friendsMockData";
+
+vi.mock("../../services/friendService", () => ({
+  friendService: {
+    detail: vi.fn(async () => ({ sharedGroups: [] }))
+  }
+}));
+
+import { friendService } from "../../services/friendService";
+
+const mockFriendDirectory = [
+  {
+    id: "fc-julio",
+    displayName: "Julio Mendoza",
+    email: "julio@mambatech.io",
+    status: "Pending",
+    friendUserId: null,
+    netBalanceCents: 0,
+    netBalanceLabel: "All settled",
+    sharedGroupCount: 0,
+    hasActiveSharedBalances: false,
+    lastUsedAtUtc: null
+  },
+  {
+    id: "fc-doug",
+    displayName: "Doug Rosenberger",
+    email: "doug@example.com",
+    status: "Connected",
+    friendUserId: "user-doug",
+    netBalanceCents: 500,
+    netBalanceLabel: "Doug owes you $5.00",
+    sharedGroupCount: 1,
+    hasActiveSharedBalances: true,
+    lastUsedAtUtc: "2026-04-01T00:00:00Z"
+  },
+  {
+    id: "fc-mina",
+    displayName: "Mina Torres",
+    email: "mina@example.com",
+    status: "Connected",
+    friendUserId: "user-mina",
+    netBalanceCents: -230,
+    netBalanceLabel: "You owe Mina $2.30",
+    sharedGroupCount: 2,
+    hasActiveSharedBalances: true,
+    lastUsedAtUtc: "2026-03-28T00:00:00Z"
+  }
+];
+
+const mockMinaDetail = {
+  id: "fc-mina",
+  displayName: "Mina Torres",
+  email: "mina@example.com",
+  status: "Connected",
+  friendUserId: "user-mina",
+  netBalanceCents: -230,
+  netBalanceLabel: "You owe Mina $2.30",
+  summary: "You owe Mina $2.30",
+  sharedGroups: [
+    {
+      groupId: "group-2",
+      groupName: "Summer Euro Trip",
+      balanceCents: 1050,
+      balanceLabel: "Mina owes you $10.50",
+      hasUnsettledExpenses: true
+    },
+    {
+      groupId: "group-3",
+      groupName: "Lake House Weekend",
+      balanceCents: -1280,
+      balanceLabel: "You owe Mina $12.80",
+      hasUnsettledExpenses: true
+    }
+  ]
+};
 
 function renderView(overrideProps = {}, contextOverrides = {}) {
   cleanup();
@@ -15,8 +88,10 @@ function renderView(overrideProps = {}, contextOverrides = {}) {
     pendingInvitesLoading: false,
     pendingInvitesError: "",
     groupOwnershipById: {},
-    friendDirectory: initialFriendDirectory,
-    selectedFriendId: "friend-julio",
+    friendDirectory: mockFriendDirectory,
+    friendsLoading: false,
+    friendsError: "",
+    selectedFriendId: "fc-julio",
     onOpenGroupPage: vi.fn(),
     onOpenAccount: vi.fn(),
     onSelectFriend: vi.fn(),
@@ -61,33 +136,46 @@ function renderView(overrideProps = {}, contextOverrides = {}) {
 
 describe("DashboardView", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-03-20T00:00:00Z"));
+    friendService.detail.mockResolvedValue({ sharedGroups: [] });
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.clearAllMocks();
   });
 
   it("renders the pending friend in the accordion list", () => {
-    renderView({ selectedFriendId: "friend-julio" });
+    renderView({ selectedFriendId: "fc-julio" });
 
-    // Accordion trigger shows name and pending status
-    const trigger = screen.getByRole("button", { name: /julio/i });
+    const trigger = screen.getByRole("button", { name: /Julio Mendoza/i });
     expect(within(trigger).getByText("Invite pending")).toBeInTheDocument();
     expect(within(trigger).getByText("Pending")).toBeInTheDocument();
   });
 
-  it("renders the accepted friend accordion expanded with expenses", () => {
-    renderView({ selectedFriendId: "friend-doug" });
+  it("renders the connected friend accordion expanded with balance strip", async () => {
+    friendService.detail.mockResolvedValueOnce({
+      sharedGroups: [
+        {
+          groupId: "group-1",
+          groupName: "Love Nest",
+          balanceCents: 500,
+          balanceLabel: "Doug owes you $5.00",
+          hasUnsettledExpenses: true
+        }
+      ]
+    });
 
-    // Accordion trigger shows friend name
+    renderView({ selectedFriendId: "fc-doug" });
+
     const trigger = screen.getByRole("button", { name: /Doug Rosenberger/i });
     expect(trigger).toHaveAttribute("aria-expanded", "true");
 
-    // Expanded body should show the balance summary and shared expense
-    expect(screen.getAllByText("Doug owes you $5.00").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Love Nest").length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getAllByText("Doug owes you $5.00").length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText("1 shared group")).toBeInTheDocument();
   });
 
   it("calls onSelectFriend when a friend is clicked in the sidebar", () => {
@@ -96,23 +184,81 @@ describe("DashboardView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Doug Rosenberger/i }));
 
-    expect(onSelectFriend).toHaveBeenCalledWith("friend-doug");
+    expect(onSelectFriend).toHaveBeenCalledWith("fc-doug");
   });
 
-  it("shows per-group balances and a net summary for Mina", () => {
-    renderView({ selectedFriendId: "friend-mina" });
+  it("renders net summary and per-group detail for Mina", async () => {
+    friendService.detail.mockResolvedValueOnce(mockMinaDetail);
 
-    // Mina's accordion should be expanded showing her expenses
+    renderView({ selectedFriendId: "fc-mina" });
+
     const trigger = screen.getByRole("button", { name: /Mina Torres/i });
     expect(trigger).toHaveAttribute("aria-expanded", "true");
 
-    // Balance strip summary
-    expect(screen.getByText("You owe Mina $2.30")).toBeInTheDocument();
-    expect(screen.getByText("2 shared groups")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByText("You owe Mina $2.30").length).toBeGreaterThan(0);
+    });
 
-    // Individual group expenses
+    expect(screen.getByText("2 shared groups")).toBeInTheDocument();
     expect(screen.getByText("Summer Euro Trip")).toBeInTheDocument();
     expect(screen.getByText("Lake House Weekend")).toBeInTheDocument();
+  });
+
+  it("shows empty state when no shared groups in detail", async () => {
+    friendService.detail.mockResolvedValueOnce({ sharedGroups: [] });
+
+    renderView({ selectedFriendId: "fc-doug" });
+
+    await waitFor(() => {
+      expect(screen.getByText("No shared expenses yet.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows friends loading state", () => {
+    renderView({ friendsLoading: true, friendDirectory: [] });
+    expect(screen.getByText("Loading friends...")).toBeInTheDocument();
+  });
+
+  it("shows friends error state", () => {
+    renderView({ friendsError: "Could not load friends.", friendDirectory: [] });
+    expect(screen.getByText("Could not load friends.")).toBeInTheDocument();
+  });
+
+  it("shows empty state when no friends and not loading", () => {
+    renderView({ friendDirectory: [], selectedFriendId: "" });
+    expect(screen.getByText("No friends found.")).toBeInTheDocument();
+  });
+
+  it("filters friends by displayName on search", () => {
+    renderView();
+
+    const searchInput = screen.getByLabelText("Find a friend");
+    fireEvent.change(searchInput, { target: { value: "mina" } });
+
+    expect(screen.getByRole("button", { name: /Mina Torres/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Doug Rosenberger/i })).not.toBeInTheDocument();
+  });
+
+  it("filters friends by email on search", () => {
+    renderView();
+
+    const searchInput = screen.getByLabelText("Find a friend");
+    fireEvent.change(searchInput, { target: { value: "doug@example" } });
+
+    expect(screen.getByRole("button", { name: /Doug Rosenberger/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Mina Torres/i })).not.toBeInTheDocument();
+  });
+
+  it("renders friends in the order received (no client-side sort)", () => {
+    renderView({ selectedFriendId: "" });
+
+    const triggers = screen.getAllByRole("button", { name: /(Julio Mendoza|Doug Rosenberger|Mina Torres)/i });
+    const names = triggers.map((t) => t.textContent?.trim()).filter(Boolean);
+
+    // Should appear in the same order as the input array: Julio, Doug, Mina
+    expect(names[0]).toMatch(/Julio/);
+    expect(names[1]).toMatch(/Doug/);
+    expect(names[2]).toMatch(/Mina/);
   });
 
   it("renders loading invite state", () => {
@@ -155,7 +301,7 @@ describe("DashboardView", () => {
   });
 
   it("switches the mobile section panel when a section tab is pressed", () => {
-    renderView({ selectedFriendId: "friend-doug" });
+    renderView({ selectedFriendId: "fc-doug" });
 
     const sectionTabs = within(screen.getByRole("navigation", { name: "Dashboard sections" })).getAllByRole("button");
     const groupsPanel = screen.getByRole("heading", { name: "Groups" }).closest(".dashboard-mobile-panel");
@@ -171,7 +317,7 @@ describe("DashboardView", () => {
     expect(groupsPanel).not.toHaveClass("is-active");
   });
 
-  it("keeps the selection flow inside the friends panel on mobile", () => {
+  it("accordion expand triggers onSelectFriend and stays in friends panel on mobile", () => {
     const onSelectFriend = vi.fn();
     renderView({ onSelectFriend });
 
@@ -180,8 +326,16 @@ describe("DashboardView", () => {
 
     const friendsPanel = screen.getByText("Find a friend").closest(".dashboard-mobile-panel");
 
-    expect(onSelectFriend).toHaveBeenCalledWith("friend-doug");
+    expect(onSelectFriend).toHaveBeenCalledWith("fc-doug");
     expect(friendsPanel).toHaveClass("is-active");
-    expect(screen.queryByRole("button", { name: "Friend" })).not.toBeInTheDocument();
+  });
+
+  it("does not display friendBalanceLabel derived text — uses API-provided netBalanceLabel", () => {
+    renderView({ selectedFriendId: "fc-doug" });
+
+    // Trigger subtitle should use API-provided label, not "Owes you" derived string
+    const trigger = screen.getByRole("button", { name: /Doug Rosenberger/i });
+    expect(within(trigger).getByText("Doug owes you $5.00")).toBeInTheDocument();
+    expect(within(trigger).queryByText("Owes you")).not.toBeInTheDocument();
   });
 });

@@ -38,7 +38,7 @@ Catalog:
 
 ## Step 1 — Frontend review (Expert React Frontend Engineer)
 
-Review the React mock-up changes in the last two commits on this branch.
+Review the React mock-up changes on this branch. review all commits
 Evaluate:
 
 1. **Component structure**: Is the accordion-based friend list in

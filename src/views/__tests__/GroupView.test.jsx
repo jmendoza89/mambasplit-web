@@ -43,7 +43,6 @@ function renderView(overrideProps = {}) {
     onCreateInvite: vi.fn().mockResolvedValue({ id: "invite-1", token: "token-1" }),
     onDeleteInvite: vi.fn(),
     onRefreshInvite: vi.fn(),
-    onCreateMockFriendInvite: vi.fn(),
     onOpenExpenseModal: vi.fn(),
     onOpenSettleUpModal: vi.fn(),
     onCloseSettleUpModal: vi.fn(),
@@ -125,9 +124,8 @@ describe("GroupView", () => {
     const userEvent = (await import("@testing-library/user-event")).default;
     const user = userEvent.setup();
     const onCreateInvite = vi.fn().mockResolvedValue({ id: "invite-1", token: "token-1" });
-    const onCreateMockFriendInvite = vi.fn();
 
-    renderView({ onCreateInvite, onCreateMockFriendInvite });
+    renderView({ onCreateInvite });
 
     // Members panel is now default; invite form lives there
     await user.type(screen.getByLabelText("Name"), "Doug Rosenberger");
@@ -136,12 +134,8 @@ describe("GroupView", () => {
 
     expect(onCreateInvite).toHaveBeenCalledWith({
       name: "Doug Rosenberger",
-      email: "doug@example.com"
-    });
-    expect(onCreateMockFriendInvite).toHaveBeenCalledWith({
-      name: "Doug Rosenberger",
       email: "doug@example.com",
-      groupName: "Test1"
+      displayName: "Doug Rosenberger"
     });
   });
 

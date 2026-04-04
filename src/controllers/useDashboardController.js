@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAccessToken } from "../api";
 import { isValidGroupName } from "../models";
-import { groupService } from "../services";
+import { friendService, groupService } from "../services";
 import { extractOwnershipFromDetail } from "../utils/groupOwnership";
 import { resolveGroupBalanceCents } from "../utils/groupBalance";
 
@@ -191,6 +191,10 @@ export function useDashboardController({
   const [inviteCandidates, setInviteCandidates] = useState([]);
   const [inviteCandidatesLoading, setInviteCandidatesLoading] = useState(false);
   const [groupOwnershipById, setGroupOwnershipById] = useState({});
+  const [friendDirectory, setFriendDirectory] = useState([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+  const [friendsError, setFriendsError] = useState("");
+  const [selectedFriendId, setSelectedFriendId] = useState("");
   const pendingInvitesRequestIdRef = useRef(0);
   const groupsSignature = groups.map((group) => `${group?.id || ""}:${group?.name || ""}`).join("|");
   // Keep a stable group reference for effects that only care about id/name changes.
@@ -201,6 +205,9 @@ export function useDashboardController({
     setGroupOwnershipById({});
     setSentInvites([]);
     setInviteResult(null);
+    setFriendDirectory([]);
+    setSelectedFriendId("");
+    setFriendsError("");
   }, [currentId]);
 
   useEffect(() => {
@@ -313,6 +320,38 @@ export function useDashboardController({
   useEffect(() => {
     loadPendingInvites();
   }, [loadPendingInvites]);
+
+  const loadFriends = useCallback(async () => {
+    if (!getAccessToken()) {
+      setFriendDirectory([]);
+      return;
+    }
+    setFriendsLoading(true);
+    setFriendsError("");
+    try {
+      const friends = await friendService.list();
+      setFriendDirectory(Array.isArray(friends) ? friends : []);
+    } catch (err) {
+      if (err?.status === 404) {
+        setFriendDirectory([]);
+      } else {
+        setFriendsError(err?.message || "Could not load friends.");
+        setFriendDirectory([]);
+      }
+    } finally {
+      setFriendsLoading(false);
+    }
+  }, []);
+
+  const onSelectFriend = useCallback((friendId) => {
+    setSelectedFriendId(friendId);
+  }, []);
+
+  useEffect(() => {
+    if (currentId && currentId !== "-") {
+      loadFriends();
+    }
+  }, [currentId, loadFriends]);
 
   const loadInviteCandidates = useCallback(async (groupId) => {
     if (!groupId || !getAccessToken()) {
@@ -438,16 +477,16 @@ export function useDashboardController({
     }
   }
 
-  async function onCreateInvite(e) {
-    e.preventDefault();
-    if (!selectedGroupId || !inviteEmail.trim()) return;
-    const requestedEmail = inviteEmail.trim();
+  async function onCreateInvite({ email: rawEmail, name, displayName: rawDisplayName } = {}) {
+    const requestedEmail = String(rawEmail || inviteEmail || "").trim();
+    const resolvedDisplayName = String(rawDisplayName || name || "").trim() || undefined;
+    if (!selectedGroupId || !requestedEmail) return null;
 
     setError("");
     setSuccess("");
     setBusy(true);
     try {
-      const invite = await groupService.createInvite(selectedGroupId, requestedEmail);
+      const invite = await groupService.createInvite(selectedGroupId, requestedEmail, resolvedDisplayName);
       const groupName = groups.find((group) => group?.id === selectedGroupId)?.name || "Group";
       const normalizedInvite = normalizeSentInvite(invite, {
         currentId,
@@ -472,6 +511,8 @@ export function useDashboardController({
         return next;
       });
       setSuccess("Invite created.");
+      await loadFriends();
+      return normalizedInvite;
     } catch (err) {
       setInviteResult(null);
       if (err?.status === 409) {
@@ -482,9 +523,10 @@ export function useDashboardController({
           ? "this user is already a member of the group."
           : "an active invite already exists for this group, or the user is already a member.";
         setError(`Could not create invite for ${requestedEmail}: ${specificReason}`);
-        return;
+        return null;
       }
       setError(err.message || "Could not create invite.");
+      return null;
     } finally {
       setBusy(false);
     }
@@ -501,6 +543,9 @@ export function useDashboardController({
     setInviteCandidates([]);
     setInviteCandidatesLoading(false);
     setGroupOwnershipById({});
+    setFriendDirectory([]);
+    setSelectedFriendId("");
+    setFriendsError("");
   }
 
   async function onAcceptPendingInvite(inviteId) {
@@ -513,6 +558,7 @@ export function useDashboardController({
       await groupService.acceptPendingInviteById(inviteId);
       await loadSessionData();
       await loadPendingInvites();
+      await loadFriends();
       setSuccess("Invite accepted. Groups refreshed.");
     } catch (err) {
       setError(err.message || "Could not accept invite.");
@@ -619,7 +665,11 @@ export function useDashboardController({
       pendingInvitesError,
       inviteCandidates,
       inviteCandidatesLoading,
-      groupOwnershipById
+      groupOwnershipById,
+      friendDirectory,
+      friendsLoading,
+      friendsError,
+      selectedFriendId
     },
     actions: {
       setNewGroupName,
@@ -631,7 +681,9 @@ export function useDashboardController({
       onRefreshInvite,
       onRefreshPendingInvites: () => loadPendingInvites({ force: true, announceRefresh: true }),
       onOpenGroupPage,
-      onResetDashboardState
+      onResetDashboardState,
+      onSelectFriend,
+      loadFriends
     }
   };
 }

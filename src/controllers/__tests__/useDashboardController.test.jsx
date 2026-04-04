@@ -5,6 +5,10 @@ import { useDashboardController } from "../useDashboardController";
 import { groupService } from "../../services";
 
 vi.mock("../../services", () => ({
+  friendService: {
+    list: vi.fn(async () => []),
+    detail: vi.fn(async () => ({ sharedGroups: [] }))
+  },
   groupService: {
     create: vi.fn(async (name) => ({ id: "g-new", name })),
     createInvite: vi.fn(async () => ({
@@ -421,7 +425,7 @@ describe("useDashboardController", () => {
       await result.current.actions.onCreateInvite({ preventDefault: vi.fn() });
     });
 
-    expect(groupService.createInvite).toHaveBeenCalledWith("group-1", "friend1@example.com");
+    expect(groupService.createInvite).toHaveBeenCalledWith("group-1", "friend1@example.com", undefined);
     expect(groupService.listGroupInvites).toHaveBeenCalledTimes(1);
     expect(result.current.state.sentInvites).toHaveLength(1);
     expect(result.current.state.sentInvites[0].sentToEmail).toBe("friend1@example.com");

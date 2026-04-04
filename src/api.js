@@ -161,7 +161,10 @@ export const groupsApi = {
   deleteExpense: (groupId, expenseId) => api(`/api/v1/groups/${groupId}/expenses/${expenseId}`, "DELETE"),
   createSettlement: (groupId, payload) => api(`/api/v1/groups/${groupId}/settlements`, "POST", payload),
   listSettlements: (groupId) => api(`/api/v1/groups/${groupId}/settlements`),
-  createInvite: (groupId, email) => api(`/api/v1/groups/${groupId}/invites`, "POST", { email }),
+  createInvite: (groupId, email, displayName) => {
+    const body = displayName ? { email, displayName } : { email };
+    return api(`/api/v1/groups/${groupId}/invites`, "POST", body);
+  },
   listGroupInvites: (groupId) => api(`/api/v1/groups/${groupId}/invites`),
   cancelInviteById: (groupId, inviteId) => api(`/api/v1/groups/${groupId}/invites/by-id/${encodeURIComponent(inviteId)}`, "DELETE"),
   cancelInvite: (groupId, token) => api(`/api/v1/groups/${groupId}/invites/${encodeURIComponent(token)}`, "DELETE"),
@@ -186,4 +189,9 @@ export const usersApi = {
 export const settlementsApi = {
   getById: (settlementId) => api(`/api/v1/settlements/${settlementId}`),
   listByUser: (userId) => api(`/api/v1/users/${userId}/settlements`)
+};
+
+export const friendsApi = {
+  list: () => api("/api/v1/friends"),
+  detail: (friendConnectionId) => api(`/api/v1/friends/${friendConnectionId}`)
 };

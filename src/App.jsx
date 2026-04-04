@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { AlertContext } from "./contexts/AlertContext";
 import { AuthContext } from "./contexts/AuthContext";
 import { useAppController } from "./controllers/useAppController";
@@ -8,68 +8,12 @@ import DashboardView from "./views/DashboardView";
 import ExpenseModal from "./views/ExpenseModal";
 import GroupView from "./views/GroupView";
 import AccountView from "./views/AccountView";
-import { initialFriendDirectory } from "./views/friendsMockData";
 import { itemVariants, listVariants } from "./views/animations";
 import Alerts from "./views/components/Alerts";
 import Header from "./views/components/Header";
 
 export default function App() {
   const { state, actions, refs } = useAppController();
-  const [friendDirectory, setFriendDirectory] = useState(initialFriendDirectory);
-  const [selectedFriendId, setSelectedFriendId] = useState(initialFriendDirectory[0]?.id || "");
-
-  const onSelectFriend = useCallback((friendId) => {
-    setSelectedFriendId(friendId);
-  }, []);
-
-  const onCreateMockFriendInvite = useCallback(({ name, email, groupName }) => {
-    const normalizedEmail = String(email || "").trim().toLowerCase();
-    const normalizedName = String(name || "").trim() || normalizedEmail || "Pending invite";
-    const normalizedGroupName = String(groupName || "Group").trim();
-    if (!normalizedEmail) return;
-
-    const nextId = `friend-${normalizedEmail.replace(/[^a-z0-9]+/g, "-")}`;
-    const existingFriend = friendDirectory.find((friend) => friend.email.toLowerCase() === normalizedEmail);
-
-    setFriendDirectory((prev) => {
-      if (existingFriend) {
-        return prev.map((friend) => (
-          friend.email.toLowerCase() === normalizedEmail
-            ? {
-                ...friend,
-                name: normalizedName,
-                status: "pending",
-                statusLabel: "Invite pending",
-                note: `Invite sent from ${normalizedGroupName}. They can appear in your friend list before they accept.`,
-                sharedGroups: friend.sharedGroups.includes(normalizedGroupName)
-                  ? friend.sharedGroups
-                  : [...friend.sharedGroups, normalizedGroupName]
-              }
-            : friend
-        ));
-      }
-
-      return [
-        {
-          id: nextId,
-          name: normalizedName,
-          email: normalizedEmail,
-          status: "pending",
-          statusLabel: "Invite pending",
-          balanceCents: 0,
-          summary: "You are all settled up",
-          sharedGroups: [normalizedGroupName],
-          note: `Invite sent from ${normalizedGroupName}. They can appear in your friend list before they accept.`,
-          emptyTitle: "No shared expenses yet",
-          emptyDetail: "Add an expense from the group page once they are part of the trip.",
-          sharedExpenses: []
-        },
-        ...prev
-      ];
-    });
-
-    setSelectedFriendId(existingFriend?.id || nextId);
-  }, [friendDirectory]);
 
   // Memoize context values to prevent unnecessary re-renders
   const authContextValue = useMemo(() => ({
@@ -193,11 +137,13 @@ export default function App() {
             pendingInvitesLoading={state.pendingInvitesLoading}
             pendingInvitesError={state.pendingInvitesError}
             groupOwnershipById={state.groupOwnershipById}
-            friendDirectory={friendDirectory}
-            selectedFriendId={selectedFriendId}
+            friendDirectory={state.friendDirectory}
+            friendsLoading={state.friendsLoading}
+            friendsError={state.friendsError}
+            selectedFriendId={state.selectedFriendId}
             onOpenGroupPage={actions.onOpenGroupPage}
             onOpenAccount={() => actions.setActiveView("account")}
-            onSelectFriend={onSelectFriend}
+            onSelectFriend={actions.onSelectFriend}
             onCreateGroup={actions.onCreateGroup}
             onAcceptPendingInvite={actions.onAcceptPendingInvite}
             onRefreshPendingInvites={actions.onRefreshPendingInvites}
@@ -244,7 +190,6 @@ export default function App() {
             onCreateInvite={actions.onCreateInvite}
             onDeleteInvite={actions.onDeleteInvite}
             onRefreshInvite={actions.onRefreshInvite}
-            onCreateMockFriendInvite={onCreateMockFriendInvite}
             onOpenExpenseModal={actions.onOpenExpenseModal}
             onOpenSettleUpModal={actions.onOpenSettleUpModal}
             onCloseSettleUpModal={actions.onCloseSettleUpModal}

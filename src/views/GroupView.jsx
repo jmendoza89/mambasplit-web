@@ -44,7 +44,6 @@ export default function GroupView({
   onCreateInvite,
   onDeleteInvite,
   onRefreshInvite,
-  onCreateMockFriendInvite,
   onOpenExpenseModal,
   onOpenSettleUpModal,
   onCloseSettleUpModal,
@@ -189,17 +188,10 @@ export default function GroupView({
 
     const createdInvite = await onCreateInvite({
       name: trimmedName,
-      email: trimmedEmail
+      email: trimmedEmail,
+      displayName: trimmedName
     });
     if (!createdInvite) return;
-
-    if (typeof onCreateMockFriendInvite === "function") {
-      onCreateMockFriendInvite({
-        name: trimmedName,
-        email: trimmedEmail,
-        groupName: detailsGroupInfo?.name || displayedGroup?.name || "Group"
-      });
-    }
     clearInviteDraft();
   }
 
