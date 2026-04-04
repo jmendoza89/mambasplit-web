@@ -1,10 +1,14 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDashboardController } from "../useDashboardController";
 import { groupService } from "../../services";
 
 vi.mock("../../services", () => ({
+  friendService: {
+    list: vi.fn(async () => []),
+    detail: vi.fn(async () => ({ sharedGroups: [] }))
+  },
   groupService: {
     create: vi.fn(async (name) => ({ id: "g-new", name })),
     createInvite: vi.fn(async () => ({
@@ -421,7 +425,7 @@ describe("useDashboardController", () => {
       await result.current.actions.onCreateInvite({ preventDefault: vi.fn() });
     });
 
-    expect(groupService.createInvite).toHaveBeenCalledWith("group-1", "friend1@example.com");
+    expect(groupService.createInvite).toHaveBeenCalledWith("group-1", "friend1@example.com", undefined);
     expect(groupService.listGroupInvites).toHaveBeenCalledTimes(1);
     expect(result.current.state.sentInvites).toHaveLength(1);
     expect(result.current.state.sentInvites[0].sentToEmail).toBe("friend1@example.com");
@@ -514,7 +518,7 @@ describe("useDashboardController", () => {
     const setError = vi.fn();
     const setSuccess = vi.fn();
     const loadSessionData = vi.fn(async () => {});
-    const args = makeControllerArgs({ setError, setSuccess, loadSessionData });
+    const args = makeControllerArgs({ setError, setSuccess, loadSessionData, me: { receivedInvites: [] } });
     const { result } = renderHook(() => useDashboardController(args));
 
     await waitFor(() => {
@@ -527,8 +531,73 @@ describe("useDashboardController", () => {
 
     expect(groupService.acceptPendingInviteById).toHaveBeenCalledWith("invite-1");
     expect(loadSessionData).toHaveBeenCalled();
+    expect(groupService.listPendingInvitesByEmail).toHaveBeenCalledWith("u@example.com");
     expect(setError).toHaveBeenCalledWith("");
     expect(setSuccess).toHaveBeenCalledWith("Invite accepted. Groups refreshed.");
+  });
+
+  it("re-hydrates existing group balances after accept refresh strips them from the group list payload", async () => {
+    groupService.details.mockImplementation(async (groupId) => ({
+      me: {
+        role: "MEMBER",
+        netBalanceCents: groupId === "group-1" ? 500 : -275
+      },
+      group: { createdBy: "someone-else" }
+    }));
+    const setError = vi.fn();
+    const setSuccess = vi.fn();
+    const setBusy = vi.fn();
+    const setSelectedGroupId = vi.fn();
+    const onOpenGroupPage = vi.fn();
+
+    const { result } = renderHook(() => {
+      const [groups, setGroups] = useState([{
+        id: "group-1",
+        name: "Trip",
+        netBalanceCents: 500
+      }]);
+      const [me, setMe] = useState({ receivedInvites: [] });
+
+      const loadSessionData = useCallback(async () => {
+        setGroups([
+          { id: "group-1", name: "Trip" },
+          { id: "group-2", name: "Dinner" }
+        ]);
+        setMe({ receivedInvites: [] });
+      }, []);
+
+      const dashboard = useDashboardController({
+        groups,
+        selectedGroupId: "group-1",
+        setGroups,
+        setSelectedGroupId,
+        setError,
+        setSuccess,
+        setBusy,
+        currentId: "user-1",
+        currentEmail: "u@example.com",
+        me,
+        loadSessionData,
+        onOpenGroupPage
+      });
+
+      return { dashboard, groups };
+    });
+
+    await waitFor(() => {
+      expect(groupService.details).toHaveBeenCalledWith("group-1");
+    });
+
+    await act(async () => {
+      await result.current.dashboard.actions.onAcceptPendingInvite("invite-1");
+    });
+
+    await waitFor(() => {
+      expect(result.current.groups).toEqual([
+        { id: "group-1", name: "Trip", netBalanceCents: 500 },
+        { id: "group-2", name: "Dinner", netBalanceCents: -275 }
+      ]);
+    });
   });
 
   it("blocks delete when invite identifier is unavailable", async () => {

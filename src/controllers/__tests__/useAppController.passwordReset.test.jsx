@@ -209,4 +209,22 @@ describe("useAppController password reset flow", () => {
 
     expect(result.current.state.success).toBe("");
   });
+
+  it("auto-clears error alerts after a short delay", () => {
+    const { result } = renderHook(() => useAppController());
+
+    expect(result.current.state.error).toBe("");
+
+    act(() => {
+      result.current.actions.onOpenPasswordResetLink("https://example.com/?resetToken=");
+    });
+
+    expect(result.current.state.error).toBe("Reset link is invalid.");
+
+    act(() => {
+      vi.advanceTimersByTime(6500);
+    });
+
+    expect(result.current.state.error).toBe("");
+  });
 });

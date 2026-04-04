@@ -41,7 +41,6 @@ export default function App() {
     setDisplayName: actions.setDisplayName,
     onSubmitAuth: actions.onSubmitAuth,
     onGoogleLogin: actions.onGoogleLogin,
-    googleButtonRef: refs.googleButtonRef,
     googleButtonStatus: state.googleButtonStatus,
     onLogout: actions.onLogout,
     onToggleAuthMode: actions.onToggleAuthMode,
@@ -75,7 +74,6 @@ export default function App() {
     actions.setDisplayName,
     actions.onSubmitAuth,
     actions.onGoogleLogin,
-    refs.googleButtonRef,
     state.googleButtonStatus,
     actions.onLogout,
     actions.onToggleAuthMode,
@@ -130,33 +128,25 @@ export default function App() {
             <AuthView />
           ) : state.activeView === "dashboard" ? (
           <DashboardView
-            currentName={state.currentName}
-            currentEmail={state.currentEmail}
-            currentId={state.currentId}
             selectedGroupId={state.selectedGroupId}
             groups={state.groups}
             newGroupName={state.newGroupName}
-            inviteEmail={state.inviteEmail}
-            inviteResult={state.inviteResult}
-            sentInvites={state.sentInvites}
             pendingInvites={state.pendingInvites}
             pendingInvitesLoading={state.pendingInvitesLoading}
             pendingInvitesError={state.pendingInvitesError}
-            inviteCandidates={state.inviteCandidates}
-            inviteCandidatesLoading={state.inviteCandidatesLoading}
             groupOwnershipById={state.groupOwnershipById}
+            friendDirectory={state.friendDirectory}
+            friendsLoading={state.friendsLoading}
+            friendsError={state.friendsError}
+            selectedFriendId={state.selectedFriendId}
             onOpenGroupPage={actions.onOpenGroupPage}
             onOpenAccount={() => actions.setActiveView("account")}
+            onSelectFriend={actions.onSelectFriend}
             onCreateGroup={actions.onCreateGroup}
-            onCreateInvite={actions.onCreateInvite}
             onAcceptPendingInvite={actions.onAcceptPendingInvite}
-            onDeleteInvite={actions.onDeleteInvite}
-            onRefreshInvite={actions.onRefreshInvite}
             onRefreshPendingInvites={actions.onRefreshPendingInvites}
-            onStartPasswordReset={actions.onStartPasswordReset}
             setSelectedGroupId={actions.setSelectedGroupId}
             setNewGroupName={actions.setNewGroupName}
-            setInviteEmail={actions.setInviteEmail}
           />
         ) : state.activeView === "account" ? (
           <AccountView
@@ -192,7 +182,12 @@ export default function App() {
             recentSettlementId={state.recentSettlementId}
             listVariants={listVariants}
             itemVariants={itemVariants}
+            sentInvites={state.sentInvites}
+            inviteResult={state.inviteResult}
             onBackToDashboard={() => actions.setActiveView("dashboard")}
+            onCreateInvite={actions.onCreateInvite}
+            onDeleteInvite={actions.onDeleteInvite}
+            onRefreshInvite={actions.onRefreshInvite}
             onOpenExpenseModal={actions.onOpenExpenseModal}
             onOpenSettleUpModal={actions.onOpenSettleUpModal}
             onCloseSettleUpModal={actions.onCloseSettleUpModal}

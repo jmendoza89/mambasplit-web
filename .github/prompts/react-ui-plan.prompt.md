@@ -3,7 +3,6 @@ name: "React UI Plan"
 description: "Workspace-scoped prompt to request focused UI changes to React components using the Expert React Frontend Engineer agent. Uses GPT-5 mini."
 agent: "Expert React Frontend Engineer"
 model: "GPT-4.1"
-related_skill: "agent-customization"
 ---
 
 Purpose

@@ -74,7 +74,6 @@ export function useAuthController({
   onResetGroupState
 }) {
   const isAuthenticated = Boolean(getAccessToken());
-  const [googleButtonNode, setGoogleButtonNode] = useState(null);
   const [googleButtonStatus, setGoogleButtonStatus] = useState(() => (
     getGoogleClientId() ? "loading" : "unconfigured"
   ));
@@ -151,12 +150,8 @@ export function useAuthController({
   }, [loadSessionData, setBusy, setError, setSuccess, setUser]);
 
   useEffect(() => {
-    const container = googleButtonNode;
-    if (!container) return;
-
     const googleClientId = getGoogleClientId();
     if (!googleClientId) {
-      container.innerHTML = "";
       setGoogleButtonStatus("unconfigured");
       return;
     }
@@ -167,24 +162,12 @@ export function useAuthController({
     (async () => {
       try {
         await ensureGoogleScriptLoaded();
-        if (cancelled || !window.google?.accounts?.id || !container.isConnected) {
+        if (cancelled || !window.google?.accounts?.id) {
           return;
         }
 
-        window.google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: onGoogleLoginSuccess
-        });
-
-        container.innerHTML = "";
-        window.google.accounts.id.renderButton(container, {
-          theme: "outline",
-          size: "large",
-          shape: "pill",
-          text: authMode === "login" ? "signin_with" : "signup_with",
-          width: 220
-        });
-        setGoogleButtonStatus(container.childElementCount > 0 ? "ready" : "error");
+        window.google.accounts.id.initialize({ client_id: googleClientId, callback: onGoogleLoginSuccess });
+        setGoogleButtonStatus("ready");
       } catch (err) {
         if (!cancelled) {
           setGoogleButtonStatus("error");
@@ -195,11 +178,8 @@ export function useAuthController({
 
     return () => {
       cancelled = true;
-      if (container) {
-        container.innerHTML = "";
-      }
     };
-  }, [authMode, googleButtonNode, onGoogleLoginSuccess, setError]);
+  }, [onGoogleLoginSuccess, setError]);
 
   function onGoogleLoginError(notification) {
     setError(toGoogleLoginError(notification));
@@ -269,7 +249,6 @@ export function useAuthController({
 
   return {
     isAuthenticated,
-    googleButtonRef: setGoogleButtonNode,
     googleButtonStatus,
     onSubmitAuth,
     onGoogleLogin,

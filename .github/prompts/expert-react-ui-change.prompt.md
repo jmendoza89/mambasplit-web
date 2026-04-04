@@ -3,7 +3,6 @@ name: "React UI Change"
 description: "Workspace-scoped prompt to request focused UI changes to React components using the Expert React Frontend Engineer agent."
 agent: "Expert React Frontend Engineer"
 model: "Claude Sonnet 4.6"
-related_skill: "agent-customization"
 ---
 
 Purpose

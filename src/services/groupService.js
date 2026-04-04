@@ -1,4 +1,4 @@
-import { groupsApi, invitesApi, meApi, settlementsApi, usersApi } from "../api";
+import { friendsApi, groupsApi, invitesApi, meApi, settlementsApi, usersApi } from "../api";
 
 export async function fetchSessionData() {
   const me = await meApi.fetchMe();
@@ -6,12 +6,17 @@ export async function fetchSessionData() {
   return { me, groups };
 }
 
+export const friendService = {
+  list: friendsApi.list,
+  detail: friendsApi.detail
+};
+
 export const groupService = {
   create: groupsApi.create,
   list: groupsApi.list,
   details: groupsApi.details,
   delete: groupsApi.delete,
-  createInvite: groupsApi.createInvite,
+  createInvite: (groupId, email, displayName) => groupsApi.createInvite(groupId, email, displayName),
   listGroupInvites: groupsApi.listGroupInvites,
   cancelInviteById: groupsApi.cancelInviteById,
   cancelInvite: groupsApi.cancelInvite,
