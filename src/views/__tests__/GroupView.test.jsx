@@ -93,15 +93,21 @@ describe("GroupView", () => {
     expect(screen.queryByText("You are settled up")).not.toBeInTheDocument();
   });
 
-  it("renders Leave Group button disabled for the group owner", () => {
+  it("renders Leave Group button disabled for the group owner", async () => {
+    const userEvent = (await import("@testing-library/user-event")).default;
+    const user = userEvent.setup();
     renderView({ isGroupOwner: true, effectiveMyRole: "OWNER" });
-    const leaveBtn = screen.getByRole("button", { name: "Leave Group" });
+    await user.click(screen.getByRole("button", { name: /Group actions for/i }));
+    const leaveBtn = screen.getByRole("menuitem", { name: "Leave Group" });
     expect(leaveBtn).toBeDisabled();
   });
 
-  it("renders Leave Group button enabled for a non-owner member", () => {
+  it("renders Leave Group button enabled for a non-owner member", async () => {
+    const userEvent = (await import("@testing-library/user-event")).default;
+    const user = userEvent.setup();
     renderView({ isGroupOwner: false, effectiveMyRole: "MEMBER" });
-    const leaveBtn = screen.getByRole("button", { name: "Leave Group" });
+    await user.click(screen.getByRole("button", { name: /Group actions for/i }));
+    const leaveBtn = screen.getByRole("menuitem", { name: "Leave Group" });
     expect(leaveBtn).not.toBeDisabled();
   });
 
@@ -110,7 +116,8 @@ describe("GroupView", () => {
     const user = userEvent.setup();
     const onOpenLeaveGroupModal = vi.fn();
     renderView({ isGroupOwner: false, effectiveMyRole: "MEMBER", onOpenLeaveGroupModal });
-    await user.click(screen.getByRole("button", { name: "Leave Group" }));
+    await user.click(screen.getByRole("button", { name: /Group actions for/i }));
+    await user.click(screen.getByRole("menuitem", { name: "Leave Group" }));
     expect(onOpenLeaveGroupModal).toHaveBeenCalledOnce();
   });
 
@@ -122,6 +129,7 @@ describe("GroupView", () => {
 
     renderView({ onCreateInvite, onCreateMockFriendInvite });
 
+    // Members panel is now default; invite form lives there
     await user.type(screen.getByLabelText("Name"), "Doug Rosenberger");
     await user.type(screen.getByLabelText("Email"), "doug@example.com");
     await user.click(screen.getByRole("button", { name: "Add person" }));
@@ -133,7 +141,6 @@ describe("GroupView", () => {
     expect(onCreateMockFriendInvite).toHaveBeenCalledWith({
       name: "Doug Rosenberger",
       email: "doug@example.com",
-      groupId: "group-1",
       groupName: "Test1"
     });
   });
@@ -160,37 +167,13 @@ describe("GroupView", () => {
     const expensesPanel = screen.getByText("Recent Expenses").closest(".group-mobile-panel");
     const membersPanel = screen.getByText("Group Members").closest(".group-mobile-panel");
 
-    expect(expensesPanel).toHaveClass("is-active");
-    expect(membersPanel).not.toHaveClass("is-active");
-
-    fireEvent.click(screen.getByRole("button", { name: "Members" }));
-
+    // Members is now the default active panel
     expect(membersPanel).toHaveClass("is-active");
     expect(expensesPanel).not.toHaveClass("is-active");
-  });
 
-  it("opens the compact mobile action menu from the more button", () => {
-    renderView();
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
 
-    const actionMenu = screen.getByRole("button", { name: "Refresh" }).closest(".group-action-secondary");
-    expect(actionMenu).not.toHaveClass("is-open");
-
-    fireEvent.click(screen.getByRole("button", { name: "More" }));
-
-    expect(actionMenu).toHaveClass("is-open");
-  });
-
-  it("toggles the collapsible group hero details", () => {
-    renderView();
-
-    const toggleButton = screen.getByRole("button", { name: "Show group stats" });
-    const heroDetails = toggleButton.nextElementSibling;
-    expect(heroDetails).not.toHaveClass("is-open");
-
-    fireEvent.click(toggleButton);
-    expect(heroDetails).toHaveClass("is-open");
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide group stats" }));
-    expect(heroDetails).not.toHaveClass("is-open");
+    expect(expensesPanel).toHaveClass("is-active");
+    expect(membersPanel).not.toHaveClass("is-active");
   });
 });

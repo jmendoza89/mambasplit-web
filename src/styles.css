@@ -638,112 +638,105 @@ button:disabled {
 .dashboard-hero {
   position: relative;
   z-index: 10;
-  padding: 20px 24px;
-  border-radius: 18px;
   margin-bottom: 16px;
-  background:
-    radial-gradient(520px 230px at 100% 0%, rgba(121, 237, 195, 0.24), transparent 62%),
-    linear-gradient(140deg, rgba(7, 54, 76, 0.95), rgba(24, 104, 133, 0.9));
-  color: #ddf8f0;
-  box-shadow: 0 18px 30px rgba(3, 52, 75, 0.28);
-  border: 1px solid rgba(184, 247, 227, 0.2);
 }
 
-.dashboard-hero-head {
+.dashboard-hero-summary-container {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.summary-card {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px;
+  border-radius: 999px;
+  background: rgba(6, 47, 68, 0.6);
+  border: 1px solid rgba(205, 252, 237, 0.34);
+  color: #ddf8f0;
+  box-shadow: 0 12px 24px rgba(3, 52, 75, 0.2);
+  text-align: center;
+}
+
+.summary-card-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: rgba(215, 252, 240, 0.86);
+}
+
+.summary-card-value {
+  font-size: clamp(1.3rem, 1.8vw, 1.5rem);
+  line-height: 1.1;
+  font-weight: 800;
+  color: #f1fff9;
+}
+
+.summary-card-value.is-positive {
+  color: #89ffd2;
+}
+
+.summary-card-value.is-negative {
+  color: #ffd4c7;
+}
+
+.summary-card.account-menu {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 16px 8px 8px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.summary-card.account-menu:hover {
+  background: rgba(6, 47, 68, 0.75);
+}
+
+.account-menu-trigger {
+  flex-grow: 1;
+  background: transparent;
+  border: none;
+  color: inherit;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: center;
+  gap: 10px;
+  padding: 0;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
 }
 
-.dashboard-hero-snapshot {
-  margin: 0;
-  font-size: clamp(0.95rem, 1.4vw, 1.1rem);
+.summary-card-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: #0b4763;
+  border: 1px solid rgba(205, 252, 237, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
   font-weight: 700;
   color: #d5f7ed;
-  line-height: 1.2;
 }
 
-.dashboard-hero-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.btn-hero-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(184, 247, 227, 0.28);
-  background: rgba(4, 40, 58, 0.4);
-  color: #f3fffb;
-  font-size: 0.88rem;
+.summary-card-name {
+  font-size: 1rem;
   font-weight: 700;
-  white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.btn-hero-action:hover:not(:disabled) {
-  background: rgba(4, 40, 58, 0.6);
-  border-color: rgba(184, 247, 227, 0.46);
-  transform: none;
-  filter: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.btn-hero-action:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.btn-hero-action.account-menu-trigger {
-  padding: 6px 14px 6px 6px;
+  color: #f1fff9;
 }
 
 .account-menu {
   position: relative;
-}
-
-.account-menu-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  padding: 6px 14px 6px 6px;
-  border-radius: 999px;
-  border: 1px solid rgba(184, 247, 227, 0.24);
-  background: rgba(4, 40, 58, 0.35);
-  color: #f3fffb;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.account-menu-trigger:hover {
-  background: rgba(4, 40, 58, 0.48);
-}
-
-.account-menu-name {
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.account-menu-avatar-image,
-.account-avatar-image {
-  display: block;
-  object-fit: cover;
-}
-
-.account-menu-avatar-image {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  border: 1px solid rgba(184, 247, 227, 0.24);
 }
 
 .account-menu-dropdown {
@@ -778,59 +771,6 @@ button:disabled {
 
 .account-menu-item-danger:hover {
   background: rgba(204, 76, 76, 0.12);
-}
-
-.dashboard-hero-stats {
-  margin-top: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.dashboard-hero-stat {
-  flex: 1 1 210px;
-  min-width: 0;
-  padding: 10px 11px;
-  border-radius: 12px;
-  border: 1px solid rgba(186, 245, 226, 0.34);
-  background: rgba(6, 47, 68, 0.45);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.dashboard-hero-stat h4 {
-  margin: 0 0 4px;
-  color: rgba(214, 252, 238, 0.78);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-weight: 800;
-}
-
-.dashboard-hero-stat strong {
-  color: #f3fffb;
-  font-size: 1rem;
-  line-height: 1.2;
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.top-user-avatar-btn {
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border-radius: 999px;
-  border: none;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-}
-
-.top-user-avatar-btn .top-user-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: 0.88rem;
 }
 
 .dash-top h2 {
@@ -1314,9 +1254,13 @@ button:disabled {
 
 .group-page-top {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 16px;
+}
+
+.group-page-top > .btn-ghost:first-child {
+  margin-right: auto;
 }
 
 .group-actions-shell {
@@ -3104,6 +3048,11 @@ button:disabled {
   text-align: right;
 }
 
+/* Inside accordion group-summary cards, left-justify balance text */
+.dashboard-friend-accordion-inner .group-summary-content .dashboard-friend-expense-amount {
+  text-align: left;
+}
+
 .dashboard-friend-expense-amount.is-positive,
 .dashboard-balance-amount.is-positive {
   color: #0a6a4f;
@@ -3316,29 +3265,11 @@ button:disabled {
 .dashboard-friend-accordion-balance-amount.is-negative { color: #b24e2c; }
 .dashboard-friend-accordion-balance-amount.is-neutral  { color: #375f6d; }
 
-.dashboard-friend-accordion-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-end;
-}
-
-.dashboard-friend-group-tag {
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(2, 64, 89, 0.18);
-  background: rgba(255, 255, 255, 0.85);
-  color: #08384f;
-  font-size: 0.75rem;
+.dashboard-friend-accordion-groups-count {
+  font-size: 0.78rem;
   font-weight: 700;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  color: #4d7480;
   white-space: nowrap;
-}
-
-.dashboard-friend-group-tag:hover {
-  background: #e8f7f2;
-  border-color: rgba(2, 64, 89, 0.3);
 }
 
 .dashboard-friend-accordion-empty {
@@ -4216,15 +4147,41 @@ button:disabled {
     margin-bottom: 16px;
   }
 
-  /* Hero: single row — snapshot left, account button right */
+  /* Hero: compact row — balances side-by-side, account button aligned */
   .dashboard-hero {
-    padding: 14px 16px;
+    padding: 12px 14px;
   }
 
   .dashboard-hero-head {
     flex-direction: row;
-    align-items: center;
-    gap: 12px;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .dashboard-hero-balances {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .dashboard-hero-balance-box {
+    padding: 7px 10px;
+    min-width: 0;
+    flex: 1 1 0;
+    border-radius: 10px;
+    gap: 1px;
+  }
+
+  .dashboard-hero-balance-label {
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+  }
+
+  .dashboard-hero-balance-value {
+    font-size: clamp(1rem, 4.5vw, 1.25rem);
   }
 
   .dashboard-hero-copy h2 {
@@ -4235,13 +4192,17 @@ button:disabled {
     width: auto;
     flex-shrink: 0;
     flex-wrap: nowrap;
+    display: flex;
+    align-items: stretch;
   }
 
   .btn-hero-action {
     flex: 0 0 auto;
     font-size: 0.84rem;
-    min-height: 38px;
-    padding: 7px 12px;
+    min-height: 0;
+    height: 100%;
+    padding: 0 12px;
+    align-items: center;
   }
 
   /* sidebar/friends panels: stacked single column, tab-controlled */
@@ -4319,12 +4280,6 @@ button:disabled {
     gap: 10px;
   }
 
-  .dashboard-friend-accordion-groups {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: flex-start;
-  }
-
   /* expense cards */
   .dashboard-friend-expense-card {
     grid-template-columns: 1fr;
@@ -4342,40 +4297,55 @@ button:disabled {
   }
 
   .group-page-top > .btn-ghost:first-child {
+    flex-basis: 100%;
     width: 100%;
   }
 
   .group-actions-shell {
-    width: 100%;
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(88px, 0.9fr);
+    flex: 1 1 auto;
+    width: auto;
+    display: flex;
     align-items: stretch;
-    gap: 10px;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .group-avatar-menu {
+    flex: 0 0 auto;
   }
 
   .group-action-primary {
-    grid-column: 1 / span 2;
-    display: grid;
-    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
-    gap: 10px;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
   }
 
   .group-action-primary button,
+  .group-page-top > .btn-ghost,
   .group-mobile-menu-trigger {
-    width: 100%;
     min-height: 44px;
-    padding: 10px;
+    padding: 10px 16px;
     font-size: 0.84rem;
     line-height: 1.1;
     white-space: nowrap;
   }
 
+  .group-action-primary button {
+    flex: 1 1 0;
+  }
+
+  .group-page-top .group-avatar-pill {
+    min-height: 44px;
+    padding: 6px 14px 6px 6px;
+    font-size: 0.84rem;
+    align-items: center;
+  }
+
   .group-mobile-menu-trigger {
-    grid-column: 3;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    align-self: stretch;
   }
 
   .group-mobile-menu-trigger.is-active {
@@ -4384,7 +4354,7 @@ button:disabled {
 
   .group-action-secondary {
     display: none;
-    grid-column: 1 / -1;
+    width: 100%;
     padding: 12px;
     border-radius: 16px;
     border: 1px solid rgba(8, 62, 86, 0.12);
@@ -4457,8 +4427,10 @@ button:disabled {
   }
 
   .group-page-top {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 8px;
   }
 
   .friends-page-header {
@@ -4590,16 +4562,38 @@ button:disabled {
   }
 
   .expense-card {
-    grid-template-columns: 52px 1fr auto;
+    grid-template-columns: 40px 1fr auto;
     grid-template-areas:
       "date title delete"
       "date summary summary";
-    row-gap: 10px;
-    column-gap: 10px;
+    row-gap: 4px;
+    column-gap: 8px;
+    padding: 9px 10px 9px 9px;
+    border-radius: 12px;
+    box-shadow: 0 6px 14px rgba(7, 66, 92, 0.1);
+  }
+
+  .expense-card::before {
+    top: 7px;
+    bottom: 7px;
+    width: 2.5px;
   }
 
   .expense-date-stack {
     grid-area: date;
+    width: 34px;
+    padding: 3px 2px;
+    border-radius: 7px;
+  }
+
+  .expense-date-month {
+    font-size: 0.56rem;
+    letter-spacing: 0.04em;
+  }
+
+  .expense-date-day {
+    margin-top: 1px;
+    font-size: 0.84rem;
   }
 
   .expense-main {
@@ -4607,24 +4601,76 @@ button:disabled {
     min-width: 0;
   }
 
+  .expense-title {
+    font-size: 0.9rem;
+  }
+
   .expense-summary {
     grid-area: summary;
     width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px 16px;
+    gap: 4px 12px;
+  }
+
+  .expense-summary-column {
+    min-height: 34px;
+    gap: 2px;
+  }
+
+  .expense-summary-label {
+    font-size: 0.48rem;
+  }
+
+  .expense-summary-amount {
+    font-size: 0.88rem;
   }
 
   .expense-card.expense-card-no-delete {
-    grid-template-columns: 52px 1fr;
+    grid-template-columns: 40px 1fr;
     grid-template-areas:
       "date title"
       "date summary";
-    padding-right: 14px;
+    padding-right: 10px;
   }
 
   .expense-delete-icon {
     grid-area: delete;
     justify-self: end;
+    width: 28px;
+    height: 28px;
+  }
+
+  .expense-delete-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Tighter list spacing */
+  .expense-list {
+    gap: 8px;
+  }
+
+  .section-panel h3 {
+    font-size: 1.05rem;
+    margin-bottom: 8px;
+  }
+
+  /* Group avatar pill: compact on mobile */
+  .group-avatar-pill {
+    padding: 4px 10px 4px 4px;
+    min-height: 36px;
+    font-size: 0.82rem;
+    gap: 6px;
+  }
+
+  .group-avatar-pill .top-user-avatar {
+    width: 26px;
+    height: 26px;
+    font-size: 0.76rem;
+  }
+
+  .group-avatar-pill-name {
+    max-width: 80px;
   }
 
   .friends-preview-cta,

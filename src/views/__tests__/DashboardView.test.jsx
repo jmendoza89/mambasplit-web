@@ -69,23 +69,25 @@ describe("DashboardView", () => {
     vi.useRealTimers();
   });
 
-  it("renders the pending friend detail state", () => {
+  it("renders the pending friend in the accordion list", () => {
     renderView({ selectedFriendId: "friend-julio" });
 
-    const stage = screen.getByText("julio@mambatech.io").closest(".dashboard-friend-stage");
-    expect(within(stage).getByRole("heading", { name: "julio" })).toBeInTheDocument();
-    expect(within(stage).getByText("Invite pending")).toBeInTheDocument();
-    expect(within(stage).getByText("You have not added any expenses yet")).toBeInTheDocument();
+    // Accordion trigger shows name and pending status
+    const trigger = screen.getByRole("button", { name: /julio/i });
+    expect(within(trigger).getByText("Invite pending")).toBeInTheDocument();
+    expect(within(trigger).getByText("Pending")).toBeInTheDocument();
   });
 
-  it("renders the accepted friend detail state", () => {
+  it("renders the accepted friend accordion expanded with expenses", () => {
     renderView({ selectedFriendId: "friend-doug" });
 
-    const stage = screen.getByText("douros03@live.com").closest(".dashboard-friend-stage");
-    expect(within(stage).getByRole("heading", { name: "Doug Rosenberger" })).toBeInTheDocument();
+    // Accordion trigger shows friend name
+    const trigger = screen.getByRole("button", { name: /Doug Rosenberger/i });
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    // Expanded body should show the balance summary and shared expense
     expect(screen.getAllByText("Doug owes you $5.00").length).toBeGreaterThan(0);
-    expect(within(stage).getByText("Love Nest")).toBeInTheDocument();
-    expect(within(stage).getByRole("button", { name: "Show settled expenses" })).toBeInTheDocument();
+    expect(screen.getAllByText("Love Nest").length).toBeGreaterThan(0);
   });
 
   it("calls onSelectFriend when a friend is clicked in the sidebar", () => {
@@ -100,15 +102,17 @@ describe("DashboardView", () => {
   it("shows per-group balances and a net summary for Mina", () => {
     renderView({ selectedFriendId: "friend-mina" });
 
-    const stage = screen.getByText("mina@example.com").closest(".dashboard-friend-stage");
-    expect(within(stage).getByText("Summer Euro Trip")).toBeInTheDocument();
-    expect(within(stage).getByText("Mina owes you $10.50")).toBeInTheDocument();
-    expect(within(stage).getByText("Lake House Weekend")).toBeInTheDocument();
-    expect(within(stage).getByText("You owe Mina $12.80")).toBeInTheDocument();
+    // Mina's accordion should be expanded showing her expenses
+    const trigger = screen.getByRole("button", { name: /Mina Torres/i });
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
 
-    const balanceRail = screen.getByText("You owe Mina $2.30").closest(".dashboard-balance-rail");
-    expect(within(balanceRail).getByText("Summer Euro Trip")).toBeInTheDocument();
-    expect(within(balanceRail).getByText("Lake House Weekend")).toBeInTheDocument();
+    // Balance strip summary
+    expect(screen.getByText("You owe Mina $2.30")).toBeInTheDocument();
+    expect(screen.getByText("2 shared groups")).toBeInTheDocument();
+
+    // Individual group expenses
+    expect(screen.getByText("Summer Euro Trip")).toBeInTheDocument();
+    expect(screen.getByText("Lake House Weekend")).toBeInTheDocument();
   });
 
   it("renders loading invite state", () => {
@@ -154,21 +158,17 @@ describe("DashboardView", () => {
     renderView({ selectedFriendId: "friend-doug" });
 
     const sectionTabs = within(screen.getByRole("navigation", { name: "Dashboard sections" })).getAllByRole("button");
-    const friendStage = screen.getByText("douros03@live.com").closest(".dashboard-friend-stage");
     const groupsPanel = screen.getByRole("heading", { name: "Groups" }).closest(".dashboard-mobile-panel");
-    const balanceRail = screen.getByText("Your balance").closest(".dashboard-balance-rail");
+    const friendsPanel = screen.getByText("Find a friend").closest(".dashboard-mobile-panel");
 
-    expect(sectionTabs[0]).toHaveTextContent("Groups");
-    expect(sectionTabs.map((tab) => tab.textContent)).toEqual(["Groups", "Balance", "Invites", "Friends"]);
+    expect(sectionTabs.map((tab) => tab.textContent)).toEqual(["Groups", "Friends"]);
     expect(groupsPanel).toHaveClass("is-active");
-    expect(friendStage).not.toHaveClass("is-active");
-    expect(balanceRail).not.toHaveClass("is-active");
+    expect(friendsPanel).not.toHaveClass("is-active");
 
-    fireEvent.click(screen.getByRole("button", { name: "Balance" }));
+    fireEvent.click(screen.getByRole("button", { name: "Friends" }));
 
-    expect(balanceRail).toHaveClass("is-active");
+    expect(friendsPanel).toHaveClass("is-active");
     expect(groupsPanel).not.toHaveClass("is-active");
-    expect(friendStage).not.toHaveClass("is-active");
   });
 
   it("keeps the selection flow inside the friends panel on mobile", () => {

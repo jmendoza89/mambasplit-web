@@ -198,13 +198,29 @@ export default function DashboardView({
 
   const filteredFriends = useMemo(() => {
     const query = friendSearch.trim().toLowerCase();
-    if (!query) return friendDirectory;
+    const matches = query
+      ? friendDirectory.filter((friend) => {
+          const haystack = `${friend.name} ${friend.email}`.toLowerCase();
+          return haystack.includes(query);
+        })
+      : [...friendDirectory];
 
-    return friendDirectory.filter((friend) => {
-      const haystack = `${friend.name} ${friend.email}`.toLowerCase();
-      return haystack.includes(query);
+    return matches.sort((a, b) => {
+      const aPending = a.status === "pending" ? 1 : 0;
+      const bPending = b.status === "pending" ? 1 : 0;
+      if (aPending !== bPending) return aPending - bPending;
+      return (a.balanceCents || 0) - (b.balanceCents || 0);
     });
   }, [friendDirectory, friendSearch]);
+
+  const totalOwedCents = useMemo(
+    () => (groups || []).reduce((sum, g) => sum + Math.max(0, g.netBalanceCents || 0), 0),
+    [groups]
+  );
+  const totalOweCents = useMemo(
+    () => (groups || []).reduce((sum, g) => sum + Math.abs(Math.min(0, g.netBalanceCents || 0)), 0),
+    [groups]
+  );
 
   function isOwnedGroup(group) {
     return checkGroupOwnership(group, currentId, currentEmail, groupOwnershipById);
@@ -340,8 +356,8 @@ export default function DashboardView({
           currentAvatarUrl={currentAvatarUrl}
           onLogout={onLogout}
           busy={busy}
-          groupCount={groups.length}
-          friendCount={friendDirectory.length}
+          totalOwedCents={totalOwedCents}
+          totalOweCents={totalOweCents}
         />
 
         <nav className="dashboard-mobile-sections" aria-label="Dashboard sections">
@@ -415,43 +431,44 @@ export default function DashboardView({
                       >
                         <div className="dashboard-friend-accordion-inner">
                           <div className={`dashboard-friend-accordion-balance-strip is-${friendBalanceTone(activeFriend.balanceCents)}`}>
-                            <div>
-                              <strong className={`dashboard-friend-accordion-balance-amount is-${friendBalanceTone(activeFriend.balanceCents)}`}>{activeFriend.summary}</strong>
-                              <p>{activeFriend.note}</p>
-                            </div>
+                            <strong className={`dashboard-friend-accordion-balance-amount is-${friendBalanceTone(activeFriend.balanceCents)}`}>{activeFriend.summary}</strong>
                             {activeFriend.sharedGroups.length ? (
-                              <div className="dashboard-friend-accordion-groups">
-                                {activeFriend.sharedGroups.map((g) => <span key={g}>{g}</span>)}
-                              </div>
+                              <span className="dashboard-friend-accordion-groups-count">
+                                {activeFriend.sharedGroups.length} shared group{activeFriend.sharedGroups.length === 1 ? "" : "s"}
+                              </span>
                             ) : null}
                           </div>
-                          <div className="dashboard-friend-accordion-actions">
-                            <button type="button" className="btn-primary" onClick={onOpenExpenseFromFriend} disabled={!groups.length}>
-                              Add Expense
-                            </button>
-                            <button type="button" className="btn-secondary" onClick={onOpenExpenseFromFriend} disabled={!groups.length || activeFriend.balanceCents === 0}>
-                              Settle Up
-                            </button>
-                          </div>
-                          {activeFriend.monthLabel ? (
-                            <p className="dashboard-friend-stage-month">{activeFriend.monthLabel}</p>
-                          ) : null}
                           {activeFriend.sharedExpenses.length ? (
                             <ul className="dashboard-friend-expense-list">
-                              {activeFriend.sharedExpenses.map((expense) => (
-                                <li key={expense.id} className="dashboard-friend-expense-card">
-                                  <div className="dashboard-friend-expense-date">{expense.dateLabel}</div>
-                                  <div className="dashboard-friend-expense-main">
-                                    <div className="dashboard-friend-expense-row">
-                                      <strong>{expense.groupName}</strong>
-                                      <span className={`dashboard-friend-expense-amount is-${expenseBalanceTone(expense, activeFriend.balanceCents)}`.trim()}>
-                                        {expense.direction} {expense.amountText}
-                                      </span>
+                              {activeFriend.sharedExpenses.map((expense) => {
+                                const group = groups.find((g) => g.name === expense.groupName);
+                                return (
+                                  <li key={expense.id} className="group-summary-card">
+                                    <div className="group-summary-row">
+                                      <div className="group-summary-select">
+                                        <span className="member-avatar-wrap group-summary-avatar-wrap">
+                                          <span className="avatar group-summary-avatar">{initials(expense.groupName)}</span>
+                                        </span>
+                                        <span className="group-summary-content">
+                                          <span className="group-summary-title">{expense.groupName}</span>
+                                          <span className={`dashboard-friend-expense-amount is-${expenseBalanceTone(expense, activeFriend.balanceCents)}`.trim()}>
+                                            {expense.direction} {expense.amountText}
+                                          </span>
+                                        </span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="btn-inline group-summary-open"
+                                        onClick={() => group && onOpenGroupPage(group.id)}
+                                        disabled={!group}
+                                      >
+                                        <span className="group-summary-open-icon" aria-hidden="true">{">"}  </span>
+                                        <span>View</span>
+                                      </button>
                                     </div>
-                                    <p>{expense.description}</p>
-                                  </div>
-                                </li>
-                              ))}
+                                  </li>
+                                );
+                              })}
                             </ul>
                           ) : (
                             <p className="dashboard-friend-accordion-empty">{activeFriend.emptyTitle || "No shared expenses yet."}</p>

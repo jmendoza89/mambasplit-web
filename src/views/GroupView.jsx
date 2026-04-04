@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatDate, formatMoney, initials } from "../utils/formatters";
@@ -12,9 +12,9 @@ import LeaveGroupModal from "./LeaveGroupModal";
 import SettleUpModal from "./SettleUpModal";
 
 const GROUP_MOBILE_SECTIONS = [
+  { id: "members", label: "Members" },
   { id: "expenses", label: "Expenses" },
-  { id: "settled", label: "Settled" },
-  { id: "members", label: "Members" }
+  { id: "settled", label: "Settled" }
 ];
 
 export default function GroupView({
@@ -64,8 +64,9 @@ export default function GroupView({
   const [collapsedSettlementIds, setCollapsedSettlementIds] = useState({});
   const [inviteFriendName, setInviteFriendName] = useState("");
   const [inviteFriendEmail, setInviteFriendEmail] = useState("");
-  const [mobileSection, setMobileSection] = useState("expenses");
-  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [mobileSection, setMobileSection] = useState("members");
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const groupAvatarMenuRef = useRef(null);
   const activeExpenses = useMemo(() => {
     const hiddenIds = new Set();
     for (const expense of expenses || []) {
@@ -202,10 +203,15 @@ export default function GroupView({
     clearInviteDraft();
   }
 
-  function handleGroupAction(action) {
-    setMobileActionsOpen(false);
-    action();
-  }
+  useEffect(() => {
+    function handlePointerDown(event) {
+      if (!groupAvatarMenuRef.current?.contains(event.target)) {
+        setAvatarMenuOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", handlePointerDown);
+    return () => window.removeEventListener("mousedown", handlePointerDown);
+  }, []);
 
   return (
     <section className="dash-wrap">
@@ -234,57 +240,55 @@ export default function GroupView({
                 Settle Up
               </button>
             </div>
+          </div>
 
+          <div className="group-avatar-menu" ref={groupAvatarMenuRef}>
             <button
+              className={`group-avatar-pill ${avatarMenuOpen ? "is-active" : ""}`.trim()}
               type="button"
-              className={`btn-ghost group-mobile-menu-trigger ${mobileActionsOpen ? "is-active" : ""}`.trim()}
-              aria-expanded={mobileActionsOpen}
-              aria-controls="groupActionMenu"
-              onClick={() => setMobileActionsOpen((prev) => !prev)}
+              aria-haspopup="menu"
+              aria-expanded={avatarMenuOpen}
+              onClick={() => setAvatarMenuOpen((prev) => !prev)}
+              title={`Actions for ${currentName || "User"}`}
+              aria-label={`Group actions for ${currentName || "User"}`}
             >
-              More
+              <span className="avatar top-user-avatar">{initials(currentName)}</span>
+              <span className="group-avatar-pill-name">{currentName}</span>
             </button>
 
-            <div id="groupActionMenu" className={`group-action-secondary ${mobileActionsOpen ? "is-open" : ""}`.trim()}>
-              <button
-                className="btn-secondary"
-                type="button"
-                onClick={() => handleGroupAction(onRefreshGroupDetail)}
-                disabled={!selectedGroupId || groupLoading}
-              >
-                {groupLoading ? "Refreshing..." : "Refresh"}
-              </button>
-              <button
-                className="btn-danger"
-                type="button"
-                onClick={() => handleGroupAction(onDeleteGroup)}
-                disabled={busy || groupLoading || !selectedGroupId || !isGroupOwner}
-                title={isGroupOwner ? "Delete this group" : "Only the group owner can delete this group"}
-              >
-                Delete Group
-              </button>
-              <button
-                className="btn-danger"
-                type="button"
-                onClick={() => handleGroupAction(onOpenLeaveGroupModal)}
-                disabled={busy || groupLoading || !selectedGroupId || isGroupOwner}
-                title={isGroupOwner ? "Group owners cannot leave their group" : "Leave this group"}
-              >
-                Leave Group
-              </button>
-              <button className="btn-ghost" type="button" onClick={() => handleGroupAction(onLogout)} disabled={busy}>
-                Logout
-              </button>
-              <button
-                className="top-user-avatar-btn"
-                type="button"
-                onClick={() => handleGroupAction(onBackToDashboard)}
-                title={`Go to dashboard (${currentName || "User"})`}
-                aria-label={`Go to dashboard as ${currentName || "User"}`}
-              >
-                <span className="avatar top-user-avatar">{initials(currentName)}</span>
-              </button>
-            </div>
+            {avatarMenuOpen ? (
+              <div className="group-avatar-menu-dropdown" role="menu">
+                <button
+                  type="button"
+                  className="group-avatar-menu-item group-avatar-menu-item-danger"
+                  role="menuitem"
+                  onClick={() => { setAvatarMenuOpen(false); onDeleteGroup(); }}
+                  disabled={busy || groupLoading || !selectedGroupId || !isGroupOwner}
+                  title={isGroupOwner ? "Delete this group" : "Only the group owner can delete this group"}
+                >
+                  Delete Group
+                </button>
+                <button
+                  type="button"
+                  className="group-avatar-menu-item group-avatar-menu-item-danger"
+                  role="menuitem"
+                  onClick={() => { setAvatarMenuOpen(false); onOpenLeaveGroupModal(); }}
+                  disabled={busy || groupLoading || !selectedGroupId || isGroupOwner}
+                  title={isGroupOwner ? "Group owners cannot leave their group" : "Leave this group"}
+                >
+                  Leave Group
+                </button>
+                <button
+                  type="button"
+                  className="group-avatar-menu-item"
+                  role="menuitem"
+                  onClick={() => { setAvatarMenuOpen(false); onLogout(); }}
+                  disabled={busy}
+                >
+                  Logout
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -361,9 +365,6 @@ export default function GroupView({
             >
               <div className="group-members-panel-copy">
                 <h3>Group Members</h3>
-                <p className="friends-panel-subtitle">
-                  Members and pending invites now live together here so each group owns its own roster.
-                </p>
               </div>
               {displayMembers.length ? (
                 <motion.ul
@@ -396,7 +397,6 @@ export default function GroupView({
                 <div className="group-members-manage-head">
                   <div>
                     <h4>Add Someone</h4>
-                    <p className="friends-panel-subtitle">Keep it simple: name, email, invite.</p>
                   </div>
                 </div>
 

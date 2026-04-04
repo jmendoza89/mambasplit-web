@@ -1,20 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { initials } from "../../utils/formatters";
-
-const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-function todayLabel() {
-  const d = new Date();
-  return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
-}
+import { formatMoney, initials } from "../../utils/formatters";
 
 export default function DashboardHero({
   currentName,
   currentAvatarUrl,
   busy,
-  groupCount,
-  friendCount,
+  totalOwedCents,
+  totalOweCents,
   onOpenAccount,
   onLogout
 }) {
@@ -33,62 +25,60 @@ export default function DashboardHero({
   }, []);
 
   return (
-    <section className="dashboard-hero card">
-      <div className="dashboard-hero-head">
-        <div className="dashboard-hero-copy">
-          <p className="dashboard-hero-kicker">{todayLabel()}</p>
-          <p className="dashboard-hero-snapshot">
-            {groupCount === 1 ? "1 group" : `${groupCount} groups`}
-            {" · "}
-            {friendCount === 1 ? "1 friend" : `${friendCount} friends`}
-          </p>
+    <section className="dashboard-hero">
+      <div className="dashboard-hero-summary-container">
+        <div className="summary-card">
+          <span className="summary-card-label">You're Owed</span>
+          <strong className="summary-card-value is-positive">{formatMoney((totalOwedCents || 0) / 100)}</strong>
+        </div>
+        <div className="summary-card">
+          <span className="summary-card-label">You Owe</span>
+          <strong className="summary-card-value is-negative">{formatMoney((totalOweCents || 0) / 100)}</strong>
         </div>
 
-        <div className="dashboard-hero-actions">
-          <div className="account-menu" ref={menuRef}>
-            <button
-              className="btn-hero-action account-menu-trigger"
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((prev) => !prev)}
-            >
-              {currentAvatarUrl ? (
-                <img className="account-menu-avatar-image" src={currentAvatarUrl} alt="" aria-hidden="true" />
-              ) : (
-                <span className="avatar dashboard-hero-avatar" aria-hidden="true">{initials(currentName)}</span>
-              )}
-              <span className="account-menu-name">{currentName}</span>
-            </button>
+        <div className="summary-card account-menu" ref={menuRef}>
+          <button
+            className="account-menu-trigger"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((prev) => !prev)}
+          >
+            {currentAvatarUrl ? (
+              <img className="account-menu-avatar-image" src={currentAvatarUrl} alt="" aria-hidden="true" />
+            ) : (
+              <span className="avatar summary-card-avatar" aria-hidden="true">{initials(currentName)}</span>
+            )}
+            <span className="summary-card-name">{currentName}</span>
+          </button>
 
-            {menuOpen ? (
-              <div className="account-menu-dropdown" role="menu">
-                <button
-                  type="button"
-                  className="account-menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onOpenAccount();
-                  }}
-                >
-                  Your Account
-                </button>
-                <button
-                  type="button"
-                  className="account-menu-item account-menu-item-danger"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onLogout();
-                  }}
-                  disabled={busy}
-                >
-                  Logout
-                </button>
-              </div>
-            ) : null}
-          </div>
+          {menuOpen ? (
+            <div className="account-menu-dropdown" role="menu">
+              <button
+                type="button"
+                className="account-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onOpenAccount();
+                }}
+              >
+                Your Account
+              </button>
+              <button
+                type="button"
+                className="account-menu-item account-menu-item-danger"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onLogout();
+                }}
+                disabled={busy}
+              >
+                Logout
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
