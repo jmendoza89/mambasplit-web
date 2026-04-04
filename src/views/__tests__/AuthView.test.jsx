@@ -7,12 +7,12 @@ import AuthView from "../AuthView";
 describe("AuthView", () => {
   it("shows signup fields, signup google action, and triggers toggle callback", () => {
     const onToggleAuthMode = vi.fn();
+    const onGoogleLogin = vi.fn();
     const setDisplayName = vi.fn();
     const setEmail = vi.fn();
     const setPassword = vi.fn();
     const onSubmitAuth = vi.fn((e) => e.preventDefault());
     const onStartPasswordReset = vi.fn();
-    const googleButtonRef = vi.fn();
 
     const authContextValue = {
       user: null,
@@ -36,8 +36,7 @@ describe("AuthView", () => {
       setResetConfirmPassword: vi.fn(),
       setDisplayName,
       onSubmitAuth,
-      onGoogleLogin: vi.fn(),
-      googleButtonRef,
+      onGoogleLogin,
       googleButtonStatus: "loading",
       onLogout: vi.fn(),
       onToggleAuthMode,
@@ -67,13 +66,68 @@ describe("AuthView", () => {
     );
 
     expect(screen.getByLabelText("Display Name")).toBeInTheDocument();
-    expect(screen.getByLabelText("Sign up with Google")).toBeInTheDocument();
-    expect(screen.getByText("Loading Google Sign-In..."))
-      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign up with Google" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Forgot password?" }));
     expect(onStartPasswordReset).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Sign up with Google" }));
+    expect(onGoogleLogin).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("link", { name: "Login" }));
     expect(onToggleAuthMode).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show the login subtitle in login mode", () => {
+    const authContextValue = {
+      user: null,
+      me: null,
+      isAuthenticated: false,
+      currentName: "User",
+      currentEmail: "-",
+      currentId: "-",
+      authMode: "login",
+      email: "",
+      password: "",
+      resetConfirmPassword: "",
+      resetTokenStatus: "idle",
+      passwordResetOutbox: null,
+      passwordResetTestValue: "",
+      showResetTestHarness: false,
+      displayName: "",
+      setAuthMode: vi.fn(),
+      setEmail: vi.fn(),
+      setPassword: vi.fn(),
+      setResetConfirmPassword: vi.fn(),
+      setDisplayName: vi.fn(),
+      onSubmitAuth: vi.fn(),
+      onGoogleLogin: vi.fn(),
+      googleButtonStatus: "ready",
+      onLogout: vi.fn(),
+      onToggleAuthMode: vi.fn(),
+      onStartPasswordReset: vi.fn(),
+      onReturnToLogin: vi.fn(),
+      onRequestPasswordReset: vi.fn(),
+      onOpenPasswordResetLink: vi.fn(),
+      onSubmitPasswordReset: vi.fn()
+    };
+
+    const alertContextValue = {
+      error: "",
+      success: "",
+      busy: false,
+      setError: vi.fn(),
+      setSuccess: vi.fn(),
+      setBusy: vi.fn(),
+      clearAlerts: vi.fn()
+    };
+
+    render(
+      <AuthContext.Provider value={authContextValue}>
+        <AlertContext.Provider value={alertContextValue}>
+          <AuthView />
+        </AlertContext.Provider>
+      </AuthContext.Provider>
+    );
+
+    expect(screen.queryByText("Pick up where your group left off.")).not.toBeInTheDocument();
   });
 
   it("shows reset harness and opens link action in reset request mode", () => {
@@ -106,7 +160,6 @@ describe("AuthView", () => {
       setDisplayName: vi.fn(),
       onSubmitAuth: vi.fn(),
       onGoogleLogin: vi.fn(),
-      googleButtonRef: vi.fn(),
       googleButtonStatus: "ready",
       onLogout: vi.fn(),
       onToggleAuthMode: vi.fn(),

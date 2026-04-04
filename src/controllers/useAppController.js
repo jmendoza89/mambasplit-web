@@ -12,6 +12,7 @@ import { useDashboardController } from "./useDashboardController";
 import { useGroupController } from "./useGroupController";
 
 const PROFILE_STORAGE_KEY = "mambasplit_account_profile";
+const ERROR_ALERT_TIMEOUT_MS = 6500;
 const SUCCESS_ALERT_TIMEOUT_MS = 4500;
 
 function getStoredProfile() {
@@ -34,6 +35,7 @@ export function useAppController() {
   const [busy, setBusyState] = useState(false);
   const busyCountRef = useRef(0);
   const busyTimeoutRef = useRef(null);
+  const errorTimeoutRef = useRef(null);
   const successTimeoutRef = useRef(null);
 
   const clearBusyWatchdog = useCallback(() => {
@@ -86,6 +88,18 @@ export function useAppController() {
       successTimeoutRef.current = null;
     }
   }, []);
+
+  const clearErrorWatchdog = useCallback(() => {
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearAlertWatchdogs = useCallback(() => {
+    clearErrorWatchdog();
+    clearSuccessWatchdog();
+  }, [clearErrorWatchdog, clearSuccessWatchdog]);
 
   const [user, setUser] = useState(getStoredUser());
   const [me, setMe] = useState(null);
@@ -188,15 +202,28 @@ export function useAppController() {
       if (prev && groupData.some((group) => group.id === prev)) return prev;
       return (groupData[0] && groupData[0].id) || "";
     });
+    return { me: meData, groups: groupData };
   }, []);
 
   // Cleanup watchdog on unmount
   useEffect(() => {
     return () => {
       resetBusyState();
-      clearSuccessWatchdog();
+      clearAlertWatchdogs();
     };
-  }, [clearSuccessWatchdog, resetBusyState]);
+  }, [clearAlertWatchdogs, resetBusyState]);
+
+  useEffect(() => {
+    clearErrorWatchdog();
+    if (!error) return undefined;
+
+    errorTimeoutRef.current = setTimeout(() => {
+      setError("");
+      errorTimeoutRef.current = null;
+    }, ERROR_ALERT_TIMEOUT_MS);
+
+    return clearErrorWatchdog;
+  }, [clearErrorWatchdog, error]);
 
   useEffect(() => {
     clearSuccessWatchdog();
@@ -520,7 +547,6 @@ export function useAppController() {
       googleButtonStatus: authController.googleButtonStatus
     },
     refs: {
-      googleButtonRef: authController.googleButtonRef,
       expenseDescriptionRef: groupController.refs.expenseDescriptionRef,
       expenseAmountRef: groupController.refs.expenseAmountRef
     },

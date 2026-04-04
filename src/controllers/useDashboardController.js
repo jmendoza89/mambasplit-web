@@ -274,6 +274,7 @@ export function useDashboardController({
   const loadPendingInvites = useCallback(async (options = {}) => {
     const force = options.force === true;
     const announceRefresh = options.announceRefresh === true;
+    const meOverride = options.meOverride;
     const requestId = pendingInvitesRequestIdRef.current + 1;
     pendingInvitesRequestIdRef.current = requestId;
 
@@ -289,13 +290,15 @@ export function useDashboardController({
         return;
       }
 
-      if (!me) {
+      const sessionMe = meOverride ?? me;
+
+      if (!sessionMe) {
         setPendingInvites([]);
         return;
       }
 
-      const invites = !force && Array.isArray(me?.receivedInvites)
-        ? me.receivedInvites
+      const invites = !force && Array.isArray(sessionMe?.receivedInvites)
+        ? sessionMe.receivedInvites
         : await groupService.listPendingInvitesByEmail(currentEmail);
       const normalized = Array.isArray(invites)
         ? invites.map(normalizePendingInvite)
@@ -556,8 +559,9 @@ export function useDashboardController({
     setBusy(true);
     try {
       await groupService.acceptPendingInviteById(inviteId);
-      await loadSessionData();
-      await loadPendingInvites();
+      const session = await loadSessionData();
+      setGroupOwnershipById({});
+      await loadPendingInvites({ force: true, meOverride: session?.me });
       await loadFriends();
       setSuccess("Invite accepted. Groups refreshed.");
     } catch (err) {
