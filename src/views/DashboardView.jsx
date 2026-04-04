@@ -175,6 +175,9 @@ export default function DashboardView({
   const [mobileSection, setMobileSection] = useState("groups");
   const [friendDetail, setFriendDetail] = useState(null);
   const [friendDetailLoading, setFriendDetailLoading] = useState(false);
+  const hasPendingInviteContent = pendingInvitesLoading
+    || Boolean(pendingInvitesError)
+    || (pendingInvites || []).length > 0;
 
   const activeFriend = useMemo(() => {
     return friendDirectory.find((friend) => friend.id === selectedFriendId) || friendDirectory[0] || null;
@@ -346,9 +349,6 @@ export default function DashboardView({
               actionDisabled={busy || pendingInvitesLoading}
             />
           ))}
-          {!pendingInvites.length ? (
-            <li className="list-empty friend-empty-state">No pending group invites.</li>
-          ) : null}
         </ul>
       ) : null}
     </article>
@@ -384,7 +384,7 @@ export default function DashboardView({
         <div className="dashboard-layout-b">
           <aside className="dashboard-social-sidebar">
             {groupsPanel}
-            {invitesPanel}
+            {hasPendingInviteContent ? invitesPanel : null}
           </aside>
 
           <section

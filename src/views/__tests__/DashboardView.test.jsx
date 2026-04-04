@@ -266,6 +266,11 @@ describe("DashboardView", () => {
     expect(screen.getByText("Loading pending invites...")).toBeInTheDocument();
   });
 
+  it("hides invites section when there are no pending invites", () => {
+    renderView({ pendingInvites: [], pendingInvitesLoading: false, pendingInvitesError: "" });
+    expect(screen.queryByRole("heading", { name: "Group invites" })).not.toBeInTheDocument();
+  });
+
   it("renders unknown sender fallback when pending invite sender details are unavailable", () => {
     renderView({
       pendingInvites: [{

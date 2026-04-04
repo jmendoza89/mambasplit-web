@@ -3541,7 +3541,31 @@ button:disabled {
   gap: 12px;
 }
 
+.group-members-manage-standalone {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.group-members-manage-standalone .group-invite-inline-actions {
+  justify-content: flex-end;
+}
+
 .group-members-manage-head h4 {
+  margin: 0;
+  color: #08384f;
+  font-size: 0.98rem;
+}
+
+.group-expenses-settled {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(2, 64, 89, 0.12);
+  display: grid;
+  gap: 12px;
+}
+
+.group-expenses-settled h4 {
   margin: 0;
   color: #08384f;
   font-size: 0.98rem;
@@ -3572,6 +3596,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .group-invite-inline-clear {
@@ -3582,6 +3607,8 @@ button:disabled {
 .group-invite-list-wrap {
   display: grid;
   gap: 10px;
+  border-top: 1px solid rgba(2, 64, 89, 0.12);
+  padding-top: 18px;
 }
 
 .group-invite-list-wrap h4 {
@@ -4151,7 +4178,7 @@ button:disabled {
   }
 
   .group-invite-inline-actions {
-    justify-content: flex-start;
+    justify-content: flex-end;
   }
 
   .dashboard-friend-expense-date {
@@ -4649,7 +4676,7 @@ button:disabled {
   }
 
   .group-invite-inline-actions {
-    justify-content: flex-start;
+    justify-content: flex-end;
   }
 
   .group-hero {

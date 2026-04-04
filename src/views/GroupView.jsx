@@ -11,11 +11,18 @@ import MemberCardItem from "./components/MemberCardItem";
 import LeaveGroupModal from "./LeaveGroupModal";
 import SettleUpModal from "./SettleUpModal";
 
+const MOBILE_LAYOUT_QUERY = "(max-width: 680px)";
+
 const GROUP_MOBILE_SECTIONS = [
   { id: "members", label: "Members" },
   { id: "expenses", label: "Expenses" },
-  { id: "settled", label: "Settled" }
+  { id: "invite", label: "Invite" }
 ];
+
+function getIsMobileLayout() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia(MOBILE_LAYOUT_QUERY).matches;
+}
 
 export default function GroupView({
   selectedGroupId,
@@ -64,6 +71,7 @@ export default function GroupView({
   const [inviteFriendName, setInviteFriendName] = useState("");
   const [inviteFriendEmail, setInviteFriendEmail] = useState("");
   const [mobileSection, setMobileSection] = useState("members");
+  const [isMobileLayout, setIsMobileLayout] = useState(getIsMobileLayout);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const groupAvatarMenuRef = useRef(null);
   const activeExpenses = useMemo(() => {
@@ -196,6 +204,21 @@ export default function GroupView({
   }
 
   useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const mediaQueryList = window.matchMedia(MOBILE_LAYOUT_QUERY);
+    const handleChange = (event) => setIsMobileLayout(event.matches);
+    setIsMobileLayout(mediaQueryList.matches);
+
+    if (typeof mediaQueryList.addEventListener === "function") {
+      mediaQueryList.addEventListener("change", handleChange);
+      return () => mediaQueryList.removeEventListener("change", handleChange);
+    }
+
+    mediaQueryList.addListener(handleChange);
+    return () => mediaQueryList.removeListener(handleChange);
+  }, []);
+
+  useEffect(() => {
     function handlePointerDown(event) {
       if (!groupAvatarMenuRef.current?.contains(event.target)) {
         setAvatarMenuOpen(false);
@@ -204,6 +227,83 @@ export default function GroupView({
     window.addEventListener("mousedown", handlePointerDown);
     return () => window.removeEventListener("mousedown", handlePointerDown);
   }, []);
+
+  function renderInviteSection({ standalone = false } = {}) {
+    return (
+      <div className={`group-members-manage ${standalone ? "group-members-manage-standalone" : ""}`.trim()}>
+        <div className="group-members-manage-head">
+          <div>
+            <h4>Invite</h4>
+          </div>
+        </div>
+
+        <form className="group-invite-inline-form" onSubmit={handleCreateGroupInvite}>
+          <div className="group-invite-inline-fields">
+            <div className="field group-invite-inline-field">
+              <label className="sr-only" htmlFor="groupInviteName">Name</label>
+              <input
+                id="groupInviteName"
+                type="text"
+                value={inviteFriendName}
+                onChange={(event) => setInviteFriendName(event.target.value)}
+                placeholder="Name"
+                maxLength={120}
+                required
+              />
+            </div>
+
+            <div className="field group-invite-inline-field">
+              <label className="sr-only" htmlFor="groupInviteEmail">Email</label>
+              <input
+                id="groupInviteEmail"
+                type="email"
+                value={inviteFriendEmail}
+                onChange={(event) => setInviteFriendEmail(event.target.value)}
+                placeholder="Email"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="group-invite-inline-actions">
+            <button type="submit" className="btn-primary" disabled={busy}>
+              Send
+            </button>
+            <button
+              type="button"
+              className="btn-ghost group-invite-inline-clear"
+              onClick={clearInviteDraft}
+              disabled={busy || (!inviteFriendName && !inviteFriendEmail)}
+              aria-label="Clear invite draft"
+              title="Clear invite draft"
+            >
+              Clear
+            </button>
+          </div>
+        </form>
+
+        {groupSentInvites.length ? (
+          <div className="group-invite-list-wrap">
+            <h4>Pending for this group</h4>
+            <ul className="list dashboard-invite-list">
+              {groupSentInvites.map((invite) => (
+                <DashboardSentInviteCard
+                  key={invite.id}
+                  groupName={invite.groupName}
+                  recipientName={invite.recipientName}
+                  recipientEmail={invite.sentToEmail}
+                  expiresAt={invite.expiresAt}
+                  onDelete={() => onDeleteInvite(invite)}
+                  onRefresh={() => onRefreshInvite(invite)}
+                  highlighted={inviteResult?.token === invite.token}
+                />
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <section className="dash-wrap">
@@ -385,79 +485,8 @@ export default function GroupView({
                 <p className="list-empty">No members found for this group yet.</p>
               )}
 
-              <div className="group-members-manage">
-                <div className="group-members-manage-head">
-                  <div>
-                    <h4>Add Someone</h4>
-                  </div>
-                </div>
+              {!isMobileLayout ? renderInviteSection() : null}
 
-                <form className="group-invite-inline-form" onSubmit={handleCreateGroupInvite}>
-                  <div className="group-invite-inline-fields">
-                    <div className="field group-invite-inline-field">
-                      <label className="sr-only" htmlFor="groupInviteName">Name</label>
-                      <input
-                        id="groupInviteName"
-                        type="text"
-                        value={inviteFriendName}
-                        onChange={(event) => setInviteFriendName(event.target.value)}
-                        placeholder="Name"
-                        maxLength={120}
-                        required
-                      />
-                    </div>
-
-                    <div className="field group-invite-inline-field">
-                      <label className="sr-only" htmlFor="groupInviteEmail">Email</label>
-                      <input
-                        id="groupInviteEmail"
-                        type="email"
-                        value={inviteFriendEmail}
-                        onChange={(event) => setInviteFriendEmail(event.target.value)}
-                        placeholder="Email"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="group-invite-inline-actions">
-                    <button type="submit" className="btn-primary" disabled={busy}>
-                      Add person
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-ghost group-invite-inline-clear"
-                      onClick={clearInviteDraft}
-                      disabled={busy || (!inviteFriendName && !inviteFriendEmail)}
-                      aria-label="Clear invite draft"
-                      title="Clear invite draft"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </form>
-
-                <div className="group-invite-list-wrap">
-                  <h4>Pending for this group</h4>
-                  <ul className="list dashboard-invite-list">
-                    {groupSentInvites.map((invite) => (
-                      <DashboardSentInviteCard
-                        key={invite.id}
-                        groupName={invite.groupName}
-                        recipientName={invite.recipientName}
-                        recipientEmail={invite.sentToEmail}
-                        expiresAt={invite.expiresAt}
-                        onDelete={() => onDeleteInvite(invite)}
-                        onRefresh={() => onRefreshInvite(invite)}
-                        highlighted={inviteResult?.token === invite.token}
-                      />
-                    ))}
-                    {!groupSentInvites.length ? (
-                      <li className="list-empty friend-empty-state">No pending invites for this group yet.</li>
-                    ) : null}
-                  </ul>
-                </div>
-              </div>
             </motion.article>
 
             <div className="group-stack">
@@ -513,69 +542,73 @@ export default function GroupView({
                 ) : (
                   <p className="list-empty">No unsettled expenses.</p>
                 )}
-              </motion.article>
 
-              <motion.article
-                className={`card panel section-panel group-mobile-panel ${mobileSection === "settled" ? "is-active" : ""}`.trim()}
-                data-mobile-panel="settled"
-                initial={{ opacity: 0, x: 14 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.25, delay: 0.1, ease: "easeOut" }}
-              >
-                <h3>Settled Expense Groups</h3>
                 {settledExpenseGroups.length ? (
-                  <ul className="settled-group-list">
-                    {settledExpenseGroups.map((group) => {
-                      const settlement = settlementMap.get(group.settlementId);
-                      const isCollapsed = collapsedSettlementIds[group.settlementId] !== false;
-                      return (
-                        <li key={group.settlementId} className="settled-group-card">
-                          <button
-                            type="button"
-                            className="settled-group-toggle"
-                            onClick={() => toggleSettlement(group.settlementId)}
-                            aria-expanded={!isCollapsed}
-                            aria-controls={`settlement-group-${group.settlementId}`}
-                          >
-                            <div className="settled-group-main">
-                              <p className="settled-group-title">
-                                <strong>{settlement?.fromUserName || "Member"}</strong>
-                                <span className="settled-group-separator">settled with</span>
-                                <strong>{settlement?.toUserName || "Member"}</strong>
-                              </p>
-                              <p className="settled-group-meta">
-                                Amount: {formatMoney((settlement?.amountCents || group.totalCents) / 100)}
-                                {" | "}Settled: {formatDate(settlement?.settledAt)}
-                                {" | "}Expenses: {group.expenses.length}
-                              </p>
-                            </div>
-                            <span className="settled-toggle-pill">{isCollapsed ? "Expand" : "Collapse"}</span>
-                          </button>
+                  <div className="group-expenses-settled">
+                    <h4>Settled Expense Groups</h4>
+                    <ul className="settled-group-list">
+                      {settledExpenseGroups.map((group) => {
+                        const settlement = settlementMap.get(group.settlementId);
+                        const isCollapsed = collapsedSettlementIds[group.settlementId] !== false;
+                        return (
+                          <li key={group.settlementId} className="settled-group-card">
+                            <button
+                              type="button"
+                              className="settled-group-toggle"
+                              onClick={() => toggleSettlement(group.settlementId)}
+                              aria-expanded={!isCollapsed}
+                              aria-controls={`settlement-group-${group.settlementId}`}
+                            >
+                              <div className="settled-group-main">
+                                <p className="settled-group-title">
+                                  <strong>{settlement?.fromUserName || "Member"}</strong>
+                                  <span className="settled-group-separator">settled with</span>
+                                  <strong>{settlement?.toUserName || "Member"}</strong>
+                                </p>
+                                <p className="settled-group-meta">
+                                  Amount: {formatMoney((settlement?.amountCents || group.totalCents) / 100)}
+                                  {" | "}Settled: {formatDate(settlement?.settledAt)}
+                                  {" | "}Expenses: {group.expenses.length}
+                                </p>
+                              </div>
+                              <span className="settled-toggle-pill">{isCollapsed ? "Expand" : "Collapse"}</span>
+                            </button>
 
-                          {!isCollapsed ? (
-                            <div id={`settlement-group-${group.settlementId}`} className="settled-group-body">
-                              <ul className="expense-list settled-expense-list">
-                                {group.expenses.map((expense) => (
-                                  <li key={expense.id} className="expense-card expense-card-no-delete">
-                                    <ExpenseCardItem
-                                      expense={expense}
-                                      currentUserId={currentId}
-                                      currentUserName={currentName}
-                                      showDeleteButton={false}
-                                    />
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <p className="list-empty">No settled expenses yet.</p>
-                )}
+                            {!isCollapsed ? (
+                              <div id={`settlement-group-${group.settlementId}`} className="settled-group-body">
+                                <ul className="expense-list settled-expense-list">
+                                  {group.expenses.map((expense) => (
+                                    <li key={expense.id} className="expense-card expense-card-no-delete">
+                                      <ExpenseCardItem
+                                        expense={expense}
+                                        currentUserId={currentId}
+                                        currentUserName={currentName}
+                                        showDeleteButton={false}
+                                      />
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : null}
               </motion.article>
+
+              {isMobileLayout ? (
+                <motion.article
+                  className={`card panel section-panel group-mobile-panel ${mobileSection === "invite" ? "is-active" : ""}`.trim()}
+                  data-mobile-panel="invite"
+                  initial={{ opacity: 0, x: 14 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.25, delay: 0.1, ease: "easeOut" }}
+                >
+                  {renderInviteSection({ standalone: true })}
+                </motion.article>
+              ) : null}
             </div>
           </div>
         )}

@@ -4,7 +4,26 @@ import { AlertContext } from "../../contexts/AlertContext";
 import { AuthContext } from "../../contexts/AuthContext";
 import GroupView from "../GroupView";
 
+function mockMatchMedia(matches = true) {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  });
+}
+
 function renderView(overrideProps = {}) {
+  const { __isMobile = true, ...viewOverrides } = overrideProps;
+  mockMatchMedia(__isMobile);
+
   const props = {
     selectedGroupId: "group-1",
     groupLoading: false,
@@ -55,7 +74,7 @@ function renderView(overrideProps = {}) {
     onOpenLeaveGroupModal: vi.fn(),
     onCancelLeaveGroup: vi.fn(),
     onConfirmLeaveGroup: vi.fn(),
-    ...overrideProps
+    ...viewOverrides
   };
 
   render(
@@ -127,10 +146,10 @@ describe("GroupView", () => {
 
     renderView({ onCreateInvite });
 
-    // Members panel is now default; invite form lives there
+    fireEvent.click(screen.getByRole("button", { name: "Invite" }));
     await user.type(screen.getByLabelText("Name"), "Doug Rosenberger");
     await user.type(screen.getByLabelText("Email"), "doug@example.com");
-    await user.click(screen.getByRole("button", { name: "Add person" }));
+    await user.click(screen.getByRole("button", { name: "Send" }));
 
     expect(onCreateInvite).toHaveBeenCalledWith({
       name: "Doug Rosenberger",
@@ -141,6 +160,7 @@ describe("GroupView", () => {
 
   it("renders sent invites for the current group", () => {
     renderView({
+      __isMobile: false,
       sentInvites: [{
         id: "sent-1",
         groupId: "group-1",
@@ -155,19 +175,84 @@ describe("GroupView", () => {
     expect(screen.getByText("Friend Person (friend@example.com)")).toBeInTheDocument();
   });
 
+  it("keeps invite section under members on desktop layout", () => {
+    renderView({ __isMobile: false });
+
+    expect(screen.getByText("Group Members")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+    expect(document.querySelector('[data-mobile-panel="invite"]')).not.toBeInTheDocument();
+  });
+
   it("switches the group mobile section panel when a section tab is pressed", () => {
     renderView();
 
     const expensesPanel = screen.getByText("Recent Expenses").closest(".group-mobile-panel");
     const membersPanel = screen.getByText("Group Members").closest(".group-mobile-panel");
+    const invitePanel = document.querySelector('[data-mobile-panel="invite"]');
 
     // Members is now the default active panel
     expect(membersPanel).toHaveClass("is-active");
     expect(expensesPanel).not.toHaveClass("is-active");
+    expect(invitePanel).not.toHaveClass("is-active");
 
     fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
 
     expect(expensesPanel).toHaveClass("is-active");
     expect(membersPanel).not.toHaveClass("is-active");
+    expect(invitePanel).not.toHaveClass("is-active");
+
+    fireEvent.click(screen.getByRole("button", { name: "Invite" }));
+
+    expect(invitePanel).toHaveClass("is-active");
+    expect(expensesPanel).not.toHaveClass("is-active");
+  });
+
+  it("hides settled expenses section in Expenses when there are no settled expenses", () => {
+    renderView({
+      expenses: [{
+        id: "expense-1",
+        description: "Lunch",
+        amountCents: 1200,
+        paidByUserId: "user-1",
+        payerUserId: "user-1",
+        settledByPayer: false,
+        splitType: "equally",
+        createdAt: "2026-03-16T00:00:00Z",
+        settlementId: null,
+        splits: [{ userId: "user-2", amountOwedCents: 1200 }]
+      }],
+      settlements: []
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+    expect(screen.queryByText("Settled Expense Groups")).not.toBeInTheDocument();
+  });
+
+  it("renders settled expenses section inside Expenses tab when settled groups exist", () => {
+    renderView({
+      expenses: [{
+        id: "expense-1",
+        description: "Dinner",
+        amountCents: 3200,
+        paidByUserId: "user-1",
+        payerUserId: "user-1",
+        settledByPayer: true,
+        splitType: "equally",
+        createdAt: "2026-03-16T00:00:00Z",
+        settlementId: "settlement-1",
+        splits: [{ userId: "user-2", amountOwedCents: 3200 }]
+      }],
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseIds: ["expense-1"]
+      }]
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+    expect(screen.getByText("Settled Expense Groups")).toBeInTheDocument();
   });
 });
