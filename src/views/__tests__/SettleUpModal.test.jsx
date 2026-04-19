@@ -1,146 +1,178 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import SettleUpModal from "../SettleUpModal";
 
-const members = [
-  { id: "00000000-0000-4000-8000-000000000001", name: "Alex" },
-  { id: "00000000-0000-4000-8000-000000000002", name: "Blair" }
-];
+const ALEX  = "00000000-0000-4000-8000-000000000001";
+const BLAIR = "00000000-0000-4000-8000-000000000002";
 
-const expenses = [
-  {
-    id: "10000000-0000-4000-8000-000000000001",
-    description: "Dinner",
-    amountCents: 1200,
-    createdAt: "2026-03-08T12:00:00Z"
-  }
+const members = [
+  { id: ALEX,  name: "Alex" },
+  { id: BLAIR, name: "Blair" }
 ];
 
 describe("SettleUpModal", () => {
   afterEach(() => cleanup());
 
-  it("prefills amount from current-user applicable values", async () => {
+  it("shows no amount when current user has no outgoing suggestion", async () => {
     render(
       <SettleUpModal
         isOpen
         onClose={vi.fn()}
-        currentUserId={members[0].id}
+        currentUserId={ALEX}
         currentUserName="Alex"
         members={members}
-        expenses={expenses}
-        settlementSuggestions={[{
-          fromUserId: members[1].id,
-          toUserId: members[0].id,
-          amountCents: 6400
-        }]}
+        settlementSuggestions={[{ fromUserId: BLAIR, toUserId: ALEX, amountCents: 6400 }]}
         groupName="Trip"
         onSaveSettlement={vi.fn()}
       />
     );
-
-    expect(screen.getAllByLabelText("Settlement amount")[0]).toHaveValue("12.00");
+    // Alex is the creditor; no outgoing suggestion — no amount span, no chips in
+    // "I'm paying"
+    expect(screen.queryByLabelText("Settlement amount")).not.toBeInTheDocument();
   });
 
-  it("prefills amount from suggestion when current user is the payer", async () => {
+  it("shows suggestion amount when current user is the payer", async () => {
     render(
       <SettleUpModal
         isOpen
         onClose={vi.fn()}
-        currentUserId={members[0].id}
+        currentUserId={ALEX}
         currentUserName="Alex"
         members={members}
-        expenses={expenses}
-        settlementSuggestions={[{
-          fromUserId: members[0].id,
-          toUserId: members[1].id,
-          amountCents: 6400
-        }]}
+        settlementSuggestions={[{ fromUserId: ALEX, toUserId: BLAIR, amountCents: 6400 }]}
         groupName="Trip"
         onSaveSettlement={vi.fn()}
       />
     );
-
-    expect(screen.getAllByLabelText("Settlement amount")[0]).toHaveValue("64.00");
+    expect(screen.getByLabelText("Settlement amount")).toHaveTextContent("64.00");
   });
 
-  it("blocks save when settlement amount is not positive", async () => {
-    const onSaveSettlement = vi.fn();
-
+  it("disables Save when there are no eligible members", async () => {
     render(
       <SettleUpModal
         isOpen
         onClose={vi.fn()}
-        currentUserId={members[0].id}
+        currentUserId={ALEX}
         currentUserName="Alex"
         members={members}
-        expenses={expenses}
         settlementSuggestions={[]}
         groupName="Trip"
-        onSaveSettlement={onSaveSettlement}
+        onSaveSettlement={vi.fn()}
       />
     );
-
-    fireEvent.change(screen.getAllByLabelText("Settlement amount")[0], { target: { value: "0.00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(await screen.findByText("Settlement amount must be greater than zero.")).toBeInTheDocument();
-    expect(onSaveSettlement).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
-  it("submits settlement payload with expenseIds", async () => {
-    const onSaveSettlement = vi.fn(async () => ({ settlementId: "settlement-1" }));
+  it("submits correct paying payload on Save", async () => {
+    const onSaveSettlement = vi.fn(async () => ({ settlementId: "s-1" }));
     const onClose = vi.fn();
 
     render(
       <SettleUpModal
         isOpen
         onClose={onClose}
-        currentUserId={members[0].id}
-        currentUserName="Alex"
+        currentUserId={BLAIR}
+        currentUserName="Blair"
         members={members}
-        expenses={expenses}
-        settlementSuggestions={[]}
+        settlementSuggestions={[{ fromUserId: BLAIR, toUserId: ALEX, amountCents: 600 }]}
         groupName="Trip"
         onSaveSettlement={onSaveSettlement}
       />
     );
 
-    fireEvent.change(screen.getAllByLabelText("Settlement amount")[0], { target: { value: "12.00" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-
     await waitFor(() => expect(onSaveSettlement).toHaveBeenCalledTimes(1));
+
+    expect(onSaveSettlement.mock.calls[0][0]).not.toHaveProperty("expenseIds");
     expect(onSaveSettlement.mock.calls[0][0]).toMatchObject({
-      fromUserId: members[0].id,
-      toUserId: members[1].id,
-      amountCents: 1200,
-      expenseIds: [expenses[0].id],
-      note: null
+      fromUserId: BLAIR,
+      toUserId: ALEX,
+      amountCents: 600,
+      note: null,
+      recordedByPayee: false
     });
     expect(onSaveSettlement.mock.calls[0][0].settledAt).toMatch(/T00:00:00[+-]\d{2}:\d{2}$/);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("blocks save when there are no unsettled expenses", async () => {
-    const onSaveSettlement = vi.fn();
+  it("submits swapped payload in I received mode", async () => {
+    const onSaveSettlement = vi.fn(async () => ({ settlementId: "s-2" }));
 
     render(
       <SettleUpModal
         isOpen
         onClose={vi.fn()}
-        currentUserId={members[0].id}
+        currentUserId={ALEX}
         currentUserName="Alex"
         members={members}
-        expenses={[]}
-        settlementSuggestions={[]}
+        settlementSuggestions={[{ fromUserId: BLAIR, toUserId: ALEX, amountCents: 6400 }]}
         groupName="Trip"
         onSaveSettlement={onSaveSettlement}
       />
     );
 
-    fireEvent.change(screen.getAllByLabelText("Settlement amount")[0], { target: { value: "1.00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "I received" }));
+    // Blair chip should be auto-selected; click Save
+    await waitFor(() => expect(screen.getByLabelText("Settlement amount")).toHaveTextContent("64.00"));
 
-    expect(await screen.findByText("No unsettled expenses are available to settle.")).toBeInTheDocument();
-    expect(onSaveSettlement).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSaveSettlement).toHaveBeenCalledTimes(1));
+
+    expect(onSaveSettlement.mock.calls[0][0]).toMatchObject({
+      fromUserId: BLAIR,
+      toUserId: ALEX,
+      amountCents: 6400,
+      recordedByPayee: true
+    });
+  });
+
+  it("uses correct pair suggestion in a 4-member group", async () => {
+    const CAROL = "00000000-0000-4000-8000-000000000003";
+    const DAVE  = "00000000-0000-4000-8000-000000000004";
+
+    render(
+      <SettleUpModal
+        isOpen
+        onClose={vi.fn()}
+        currentUserId={BLAIR}
+        currentUserName="Blair"
+        members={[
+          { id: ALEX, name: "Alex" }, { id: BLAIR, name: "Blair" },
+          { id: CAROL, name: "Carol" }, { id: DAVE, name: "Dave" }
+        ]}
+        settlementSuggestions={[
+          { fromUserId: BLAIR, toUserId: ALEX,  amountCents: 2500 },
+          { fromUserId: DAVE,  toUserId: CAROL, amountCents: 3000 }
+        ]}
+        groupName="4P"
+        onSaveSettlement={vi.fn()}
+      />
+    );
+
+    // Blair owes Alex .00; Dave's .00 must not appear
+    expect(screen.getByLabelText("Settlement amount")).toHaveTextContent("25.00");
+    expect(screen.queryByText("30.00")).not.toBeInTheDocument();
+  });
+
+  it("shows contextual message and disables Save when no suggestions exist", async () => {
+    render(
+      <SettleUpModal
+        isOpen
+        onClose={vi.fn()}
+        currentUserId={BLAIR}
+        currentUserName="Blair"
+        members={members}
+        settlementSuggestions={[]}
+        groupName="Trip"
+        onSaveSettlement={vi.fn()}
+      />
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("You have no outstanding amounts to pay.")
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 });

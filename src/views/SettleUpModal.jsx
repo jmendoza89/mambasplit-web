@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
-import { initials } from "../utils/formatters";
+import { formatMoney, initials } from "../utils/formatters";
 
 function todayIsoDate() {
   const now = new Date();
@@ -24,55 +24,26 @@ function pairKey(fromUserId, toUserId) {
   return `${fromUserId || ""}->${toUserId || ""}`;
 }
 
-function computePairBalanceCents(expenses, fromUserId, toUserId) {
-  if (!fromUserId || !toUserId) return 0;
-
-  let netCents = 0;
-  for (const expense of expenses || []) {
-    const splits = Array.isArray(expense?.splits) ? expense.splits : [];
-    if (expense?.payerUserId === toUserId) {
-      const owedByFrom = splits
-        .filter((split) => split?.userId === fromUserId)
-        .reduce((sum, split) => sum + (split?.amountOwedCents || 0), 0);
-      netCents += owedByFrom;
-    }
-
-    if (expense?.payerUserId === fromUserId) {
-      const owedByTo = splits
-        .filter((split) => split?.userId === toUserId)
-        .reduce((sum, split) => sum + (split?.amountOwedCents || 0), 0);
-      netCents -= owedByTo;
-    }
-  }
-
-  return Math.max(0, netCents);
+// Returns members the current user owes (they appear as toUserId in a
+// suggestion from currentUser)
+function membersCurrentUserOwes(currentUserId, members, suggestions) {
+  const ids = new Set(
+    (suggestions || [])
+      .filter((s) => s?.fromUserId === currentUserId && s?.toUserId !== currentUserId)
+      .map((s) => s.toUserId)
+  );
+  return (members || []).filter((m) => ids.has(m?.id));
 }
 
-function pickBestReceiverId(currentUserId, members, expenses, suggestions) {
-  if (!currentUserId) return "";
-  const receiverCandidates = (members || []).filter((member) => member?.id && member.id !== currentUserId);
-  if (!receiverCandidates.length) return "";
-
-  let bestReceiverId = "";
-  let bestAmount = 0;
-  for (const candidate of receiverCandidates) {
-    const amountCents = computePairBalanceCents(expenses, currentUserId, candidate.id);
-    if (amountCents > bestAmount) {
-      bestAmount = amountCents;
-      bestReceiverId = candidate.id;
-    }
-  }
-
-  if (bestReceiverId) return bestReceiverId;
-
-  const suggestionReceiverId = (suggestions || []).find(
-    (suggestion) => suggestion?.fromUserId === currentUserId && suggestion?.toUserId && suggestion.toUserId !== currentUserId
-  )?.toUserId;
-  if (suggestionReceiverId && receiverCandidates.some((member) => member.id === suggestionReceiverId)) {
-    return suggestionReceiverId;
-  }
-
-  return receiverCandidates[0]?.id || "";
+// Returns members who owe the current user (they appear as fromUserId toward
+// currentUser)
+function membersWhoOweCurrentUser(currentUserId, members, suggestions) {
+  const ids = new Set(
+    (suggestions || [])
+      .filter((s) => s?.toUserId === currentUserId && s?.fromUserId !== currentUserId)
+      .map((s) => s.fromUserId)
+  );
+  return (members || []).filter((m) => ids.has(m?.id));
 }
 
 export default function SettleUpModal({
@@ -81,142 +52,91 @@ export default function SettleUpModal({
   currentUserId,
   currentUserName,
   members,
-  expenses,
   settlementSuggestions,
   onSaveSettlement,
   groupName
 }) {
-  const [cashAmount, setCashAmount] = useState("0.00");
-  const [fromUserId, setFromUserId] = useState("");
-  const [toUserId, setToUserId] = useState("");
+  // "paying" = I am paying someone | "received" = someone paid me
+  const [perspective, setPerspective] = useState("paying");
+  const [selectedMemberId, setSelectedMemberId] = useState("");
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState("");
   const [settlementDate, setSettlementDate] = useState(todayIsoDate());
   const maxSettlementDate = useMemo(() => todayIsoDate(), []);
 
   const safeMembers = useMemo(() => (Array.isArray(members) ? members : []), [members]);
-  const safeExpenses = useMemo(() => (Array.isArray(expenses) ? expenses : []), [expenses]);
   const safeSuggestions = useMemo(
     () => (Array.isArray(settlementSuggestions) ? settlementSuggestions : []),
     [settlementSuggestions]
   );
-  const expenseById = useMemo(
-    () => new Map(safeExpenses.map((expense) => [expense.id, expense])),
-    [safeExpenses]
-  );
-  const autoSelectedExpenseIds = useMemo(
-    () => safeExpenses.map((expense) => expense.id).filter(Boolean),
-    [safeExpenses]
-  );
-  const autoSelectedExpenseTotalCents = useMemo(
-    () => autoSelectedExpenseIds.reduce((sum, expenseId) => (
-      sum + (expenseById.get(expenseId)?.amountCents || 0)
-    ), 0),
-    [autoSelectedExpenseIds, expenseById]
-  );
+
+  // Derive fromUserId / toUserId from perspective
+  const fromUserId = perspective === "paying" ? currentUserId : selectedMemberId;
+  const toUserId = perspective === "paying" ? selectedMemberId : currentUserId;
+
   const suggestionAmountByPair = useMemo(() => {
     const map = new Map();
-    for (const suggestion of safeSuggestions) {
-      const key = pairKey(suggestion?.fromUserId, suggestion?.toUserId);
+    for (const s of safeSuggestions) {
+      const key = pairKey(s?.fromUserId, s?.toUserId);
       if (!key) continue;
-      map.set(key, suggestion?.amountCents || 0);
+      map.set(key, s?.amountCents || 0);
     }
     return map;
   }, [safeSuggestions]);
-  const expectedPairAmountCents = useMemo(() => {
-    const computedFromExpenses = computePairBalanceCents(safeExpenses, fromUserId, toUserId);
-    if (computedFromExpenses > 0) {
-      return computedFromExpenses;
-    }
-    const fromToSuggestion = suggestionAmountByPair.get(pairKey(fromUserId, toUserId));
-    if (typeof fromToSuggestion === "number" && fromToSuggestion > 0) {
-      return fromToSuggestion;
-    }
-    return Math.max(0, autoSelectedExpenseTotalCents);
-  }, [suggestionAmountByPair, fromUserId, toUserId, safeExpenses, autoSelectedExpenseTotalCents]);
-  const selectedFromMember = safeMembers.find((member) => member.id === fromUserId) || null;
-  const selectedToMember = safeMembers.find((member) => member.id === toUserId) || null;
 
+  const expectedAmountCents = useMemo(
+    () => suggestionAmountByPair.get(pairKey(fromUserId, toUserId)) ?? 0,
+    [suggestionAmountByPair, fromUserId, toUserId]
+  );
+
+  const eligibleMembers = useMemo(() => {
+    if (perspective === "paying") {
+      return membersCurrentUserOwes(currentUserId, safeMembers, safeSuggestions);
+    }
+    return membersWhoOweCurrentUser(currentUserId, safeMembers, safeSuggestions);
+  }, [perspective, currentUserId, safeMembers, safeSuggestions]);
+
+  const selectedMember = safeMembers.find((m) => m?.id === selectedMemberId) || null;
+
+  const noSuggestion = selectedMemberId !== "" && expectedAmountCents === 0;
+
+  // Reset on close
   useEffect(() => {
     if (isOpen) return;
-    setCashAmount("0.00");
-    setFromUserId("");
-    setToUserId("");
+    setPerspective("paying");
+    setSelectedMemberId("");
     setLocalError("");
     setSaving(false);
     setSettlementDate(todayIsoDate());
   }, [isOpen]);
 
+  // Auto-select best member on open or perspective change
   useEffect(() => {
     if (!isOpen) return;
-    const resolvedToUserId = pickBestReceiverId(currentUserId, safeMembers, safeExpenses, safeSuggestions);
-    const computedFromExpenses = computePairBalanceCents(safeExpenses, currentUserId, resolvedToUserId);
-    const suggestedAmount = suggestionAmountByPair.get(pairKey(currentUserId, resolvedToUserId)) || 0;
-    const resolvedAmountCents = computedFromExpenses > 0
-      ? computedFromExpenses
-      : Math.max(0, suggestedAmount || autoSelectedExpenseTotalCents);
-    setFromUserId(currentUserId || "");
-    setToUserId(resolvedToUserId);
-    setCashAmount((resolvedAmountCents / 100).toFixed(2));
-  }, [
-    isOpen,
-    safeMembers,
-    safeSuggestions,
-    safeExpenses,
-    currentUserId,
-    autoSelectedExpenseTotalCents,
-    suggestionAmountByPair
-  ]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!fromUserId || !toUserId) return;
-    setCashAmount((Math.max(0, expectedPairAmountCents) / 100).toFixed(2));
-  }, [isOpen, fromUserId, toUserId, expectedPairAmountCents]);
-
-  const handleCashAmountChange = (event) => {
-    const nextValue = event.target.value;
-    if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
-    setCashAmount(nextValue);
-  };
+    const best = eligibleMembers[0]?.id || "";
+    setSelectedMemberId(best);
+    setLocalError("");
+  }, [isOpen, perspective, eligibleMembers]);
 
   const handleSave = async () => {
-    const effectiveFromUserId = currentUserId || "";
-    const amountCents = Math.round(Number(cashAmount || "0") * 100);
-    if (!effectiveFromUserId) {
-      setLocalError("Could not determine current user id for payer.");
+    if (!selectedMemberId) {
+      setLocalError("Select who you are settling with.");
       return;
     }
-
-    if (!toUserId) {
-      setLocalError("Select both payer and receiver.");
-      return;
-    }
-
-    if (effectiveFromUserId === toUserId) {
+    if (fromUserId === toUserId) {
       setLocalError("Payer and receiver must be different members.");
       return;
     }
-
-    if (!Number.isFinite(amountCents) || amountCents <= 0) {
-      setLocalError("Settlement amount must be greater than zero.");
+    if (!Number.isFinite(expectedAmountCents) || expectedAmountCents <= 0) {
+      setLocalError("No outstanding balance found for this pair.");
       return;
     }
-
-    if (autoSelectedExpenseIds.length === 0) {
-      setLocalError("No unsettled expenses are available to settle.");
+    if (noSuggestion) {
+      setLocalError("No outstanding balance found for this pair.");
       return;
     }
-
     if (!settlementDate) {
       setLocalError("Settlement date is required.");
-      return;
-    }
-
-    if (expectedPairAmountCents > 0 && amountCents !== expectedPairAmountCents) {
-      setLocalError(
-        `Settlement amount (${(amountCents / 100).toFixed(2)}) must match outstanding balance (${(expectedPairAmountCents / 100).toFixed(2)}).`
-      );
       return;
     }
 
@@ -224,12 +144,12 @@ export default function SettleUpModal({
     setSaving(true);
     try {
       const result = await onSaveSettlement({
-        fromUserId: effectiveFromUserId,
+        fromUserId,
         toUserId,
-        amountCents,
-        expenseIds: autoSelectedExpenseIds,
+        amountCents: expectedAmountCents,
         note: null,
-        settledAt: toIsoLocalDateTime(settlementDate)
+        settledAt: toIsoLocalDateTime(settlementDate),
+        recordedByPayee: perspective === "received"
       });
 
       if (result?.errorMessage) {
@@ -244,6 +164,13 @@ export default function SettleUpModal({
       setSaving(false);
     }
   };
+
+  const fromName = perspective === "paying"
+    ? (currentUserName || "You")
+    : (selectedMember?.name || "…");
+  const toName = perspective === "paying"
+    ? (selectedMember?.name || "…")
+    : (currentUserName || "You");
 
   return (
     <AnimatePresence>
@@ -270,6 +197,11 @@ export default function SettleUpModal({
             <div className="modal-header">
               <div>
                 <h3 id="settleUpModalTitle">Settle up</h3>
+                {groupName ? (
+                  <div className="settlement-group-pill" style={{ marginTop: 6 }}>
+                    {groupName}
+                  </div>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -283,81 +215,107 @@ export default function SettleUpModal({
 
             <div className="settle-up-content">
               <div className="settlement-entry-view">
-                <div className="settlement-group-pill settlement-group-pill-top">{groupName || "Group"}</div>
 
-                <div className="settlement-avatar-row">
-                  <div className="settlement-avatar">{initials(selectedFromMember?.name || currentUserName || "You")}</div>
-                  <span className="settlement-arrow" aria-hidden="true">
-                    &#8594;
-                  </span>
-                  <div className="settlement-avatar">{initials(selectedToMember?.name || "Member")}</div>
-                </div>
-
-                <div className="field">
-                  <label htmlFor="settlementFromUser">From</label>
-                  <select
-                    id="settlementFromUser"
-                    value={fromUserId}
-                    disabled
+                {/* Perspective toggle */}
+                <div className="settle-perspective-toggle" role="group" aria-label="Settlement perspective">
+                  <button
+                    type="button"
+                    className={`settle-perspective-btn${perspective === "paying" ? " is-active" : ""}`}
+                    onClick={() => setPerspective("paying")}
+                    aria-pressed={perspective === "paying"}
                   >
-                    <option value={currentUserId || ""}>{selectedFromMember?.name || currentUserName || "You"}</option>
-                  </select>
-                </div>
-
-                <div className="field">
-                  <label htmlFor="settlementToUser">To</label>
-                  <select
-                    id="settlementToUser"
-                    value={toUserId}
-                    onChange={(event) => setToUserId(event.target.value)}
+                    I&apos;m paying
+                  </button>
+                  <button
+                    type="button"
+                    className={`settle-perspective-btn${perspective === "received" ? " is-active" : ""}`}
+                    onClick={() => setPerspective("received")}
+                    aria-pressed={perspective === "received"}
                   >
-                    <option value="">Select receiver</option>
-                    {safeMembers.filter((member) => member.id !== (currentUserId || "")).map((member) => (
-                      <option key={member.id} value={member.id}>{member.name}</option>
-                    ))}
-                  </select>
+                    I received
+                  </button>
                 </div>
 
-                <div className="settlement-amount-wrap">
-                  <span className="settlement-currency">$</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    className="settlement-amount-input"
-                    value={cashAmount}
-                    onChange={handleCashAmountChange}
-                    aria-label="Settlement amount"
-                  />
-                </div>
+                {/* Member chip selector */}
+                {eligibleMembers.length > 0 ? (
+                  <div className="settle-member-chips" role="listbox" aria-label="Select member">
+                    {eligibleMembers.map((member) => {
+                      const key = perspective === "paying"
+                        ? pairKey(currentUserId, member.id)
+                        : pairKey(member.id, currentUserId);
+                      const amt = suggestionAmountByPair.get(key) ?? 0;
+                      return (
+                        <button
+                          key={member.id}
+                          type="button"
+                          role="option"
+                          aria-selected={selectedMemberId === member.id}
+                          className={`settle-member-chip${selectedMemberId === member.id ? " is-selected" : ""}`}
+                          onClick={() => setSelectedMemberId(member.id)}
+                        >
+                          <div className="settle-chip-avatar">{initials(member.name)}</div>
+                          <span>{member.name}</span>
+                          {amt > 0 ? (
+                            <span className="settle-chip-balance">{formatMoney(amt / 100)}</span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="alert" style={{ marginBottom: 14 }}>
+                    {perspective === "paying"
+                      ? "You have no outstanding amounts to pay."
+                      : "No one owes you in this group."}
+                  </p>
+                )}
 
+                {/* Direction pill */}
+                {selectedMemberId && !noSuggestion ? (
+                  <div className="settle-direction-pill" aria-label="Payment direction">
+                    {fromName} &rarr; {toName}
+                  </div>
+                ) : null}
+
+                {/* Amount — locked to full suggestion, read-only */}
+                {expectedAmountCents > 0 ? (
+                  <div className="settlement-amount-wrap">
+                    <span className="settlement-currency">$</span>
+                    <span
+                      className="settlement-amount-input"
+                      style={{ display: "inline-flex", alignItems: "baseline", justifyContent: "center" }}
+                      aria-label="Settlement amount"
+                    >
+                      {(expectedAmountCents / 100).toFixed(2)}
+                    </span>
+                  </div>
+                ) : null}
+
+                {/* Date */}
                 <div className="settlement-meta-grid">
                   <input
                     type="date"
                     className="settlement-pill-input"
                     value={settlementDate}
-                    onChange={(event) => setSettlementDate(event.target.value)}
+                    onChange={(e) => setSettlementDate(e.target.value)}
                     max={maxSettlementDate}
                     aria-label="Settlement date"
                   />
                 </div>
 
-                {localError ? <p className="alert">{localError}</p> : null}
+                {localError ? <p className="alert" style={{ marginTop: 10 }}>{localError}</p> : null}
               </div>
             </div>
 
             <div className="actions modal-actions settle-up-actions">
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={onClose}
-              >
+              <button type="button" className="btn-ghost" onClick={onClose}>
                 Cancel
               </button>
               <motion.button
                 type="button"
                 className="btn-primary"
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || eligibleMembers.length === 0}
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.98 }}
               >
