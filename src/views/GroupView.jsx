@@ -125,10 +125,6 @@ export default function GroupView({
     return map;
   }, [displayMembers, unsettledExpenses]);
   const currentUserUnsettledNetCents = unsettledNetByUserId.get(currentId) || 0;
-  const currentUserHasPaidUnsettledExpenses = useMemo(
-    () => (unsettledExpenses || []).some((expense) => expense?.payerUserId === currentId),
-    [unsettledExpenses, currentId]
-  );
   const balanceDiagnostics = useMemo(() => {
     const rows = (displayMembers || []).map((member, index) => {
       const memberId = member?.id || `member-${index}`;
@@ -571,7 +567,7 @@ export default function GroupView({
                                 <p className="settled-group-meta">
                                   Amount: {formatMoney((settlement?.amountCents || group.totalCents) / 100)}
                                   {" | "}Settled: {formatDate(settlement?.settledAt)}
-                                  {" | "}Expenses: {settlement?.expenseIds?.length ?? group.expenses.length}
+                                  {" | "}Expenses: {group.expenses.length}
                                 </p>
                               </div>
                               <span className="settled-toggle-pill">{isCollapsed ? "Expand" : "Collapse"}</span>
@@ -635,7 +631,6 @@ export default function GroupView({
         onConfirm={onConfirmLeaveGroup}
         groupName={detailsGroupInfo?.name || displayedGroup?.name || "Group"}
         currentUserUnsettledNetCents={currentUserUnsettledNetCents}
-        hasPaidUnsettledExpenses={currentUserHasPaidUnsettledExpenses}
         busy={busy}
       />
     </section>

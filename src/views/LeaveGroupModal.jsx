@@ -8,14 +8,12 @@ export default function LeaveGroupModal({
   onConfirm,
   groupName,
   currentUserUnsettledNetCents,
-  hasPaidUnsettledExpenses,
   busy
 }) {
   const [confirming, setConfirming] = useState(false);
   const owedCents = Math.max(0, -(currentUserUnsettledNetCents || 0));
   const hasDebt = owedCents > 0;
-  const isBlocked = Boolean(hasPaidUnsettledExpenses);
-  const isDisabled = confirming || Boolean(busy) || isBlocked;
+  const isDisabled = confirming || Boolean(busy);
 
   async function handleConfirm() {
     if (isDisabled) return;
@@ -58,34 +56,26 @@ export default function LeaveGroupModal({
                 className="modal-close"
                 onClick={onClose}
                 aria-label="Close leave group dialog"
-                disabled={confirming || Boolean(busy)}
+                disabled={isDisabled}
               >
                 &times;
               </button>
             </div>
 
             <div className="leave-group-content">
-              {hasPaidUnsettledExpenses ? (
-                <p className="leave-group-blocked">
-                  You have unsettled expenses where you are the payer. Please delete or settle them before leaving the group.
+              <p>
+                {hasDebt
+                  ? `You currently owe ${formatMoney(owedCents / 100)} in unsettled expenses.`
+                  : "You do not currently owe anything in unsettled expenses."}
+              </p>
+              {hasDebt ? (
+                <p>
+                  If you leave this group, unsettled expenses will be rebalanced across the remaining members.
                 </p>
-              ) : (
-                <>
-                  <p>
-                    {hasDebt
-                      ? `You currently owe ${formatMoney(owedCents / 100)} in unsettled expenses.`
-                      : "You do not currently owe anything in unsettled expenses."}
-                  </p>
-                  {hasDebt ? (
-                    <p>
-                      If you leave this group, unsettled expenses will be rebalanced across the remaining members.
-                    </p>
-                  ) : null}
-                  <p>
-                    Are you sure you want to leave <strong>{groupName || "this group"}</strong>?
-                  </p>
-                </>
-              )}
+              ) : null}
+              <p>
+                Are you sure you want to leave <strong>{groupName || "this group"}</strong>?
+              </p>
             </div>
 
             <div className="actions modal-actions">

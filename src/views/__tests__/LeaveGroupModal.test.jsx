@@ -78,19 +78,4 @@ describe("LeaveGroupModal", () => {
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Leave Group" })).toBeDisabled();
   });
-
-  it("shows blocked message and disables Leave Group when hasPaidUnsettledExpenses is true", async () => {
-    const user = userEvent.setup();
-    const { onConfirm, onClose } = renderModal({ hasPaidUnsettledExpenses: true });
-    expect(screen.getByText(/unsettled expenses where you are the payer/)).toBeInTheDocument();
-    expect(screen.queryByText(/Are you sure you want to leave/)).not.toBeInTheDocument();
-    const leaveBtn = screen.getByRole("button", { name: "Leave Group" });
-    expect(leaveBtn).toBeDisabled();
-    await user.click(leaveBtn);
-    expect(onConfirm).not.toHaveBeenCalled();
-    const closeBtn = screen.getByRole("button", { name: "Close leave group dialog" });
-    expect(closeBtn).not.toBeDisabled();
-    await user.click(closeBtn);
-    expect(onClose).toHaveBeenCalledOnce();
-  });
 });
