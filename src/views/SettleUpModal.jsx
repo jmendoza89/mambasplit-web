@@ -110,14 +110,6 @@ export default function SettleUpModal({
     setSettlementDate(todayIsoDate());
   }, [isOpen]);
 
-  // Set perspective automatically when modal opens:
-  // default to "paying" if the current user owes anyone, otherwise "received"
-  useEffect(() => {
-    if (!isOpen) return;
-    const owes = membersCurrentUserOwes(currentUserId, safeMembers, safeSuggestions);
-    setPerspective(owes.length > 0 ? "paying" : "received");
-  }, [isOpen, currentUserId, safeMembers, safeSuggestions]);
-
   // Auto-select best member on open or perspective change
   useEffect(() => {
     if (!isOpen) return;
