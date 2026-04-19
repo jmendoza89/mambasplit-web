@@ -48,7 +48,6 @@ export default function SettleUpModal({
   currentUserId,
   currentUserName,
   members,
-  expenses,
   settlementSuggestions,
   onSaveSettlement,
   groupName
