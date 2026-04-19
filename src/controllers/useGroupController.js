@@ -364,6 +364,7 @@ export function useGroupController({
       const result = await groupService.createSettlement(selectedGroupId, payload);
       const normalizedResult = result || { settlementId: null };
       setRecentSettlementId(result?.settlementId || result?.settlement?.id || null);
+
       await loadGroupDetail(selectedGroupId, { force: true });
       setSuccess("Settlement saved.");
       setIsSettleUpModalOpen(false);

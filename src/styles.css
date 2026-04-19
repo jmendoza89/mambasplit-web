@@ -2184,8 +2184,8 @@ button:disabled {
   gap: 10px;
   padding: 16px 18px 15px;
   background:
-    radial-gradient(300px 140px at 100% 0%, rgba(155, 248, 216, 0.25), transparent 74%),
-    linear-gradient(130deg, #48b79a, #6fddb9);
+    radial-gradient(420px 200px at 100% 0%, rgba(96, 222, 172, 0.22), transparent 64%),
+    linear-gradient(140deg, rgba(6, 47, 68, 0.97), rgba(24, 104, 133, 0.92));
 }
 
 .modal-header h3 {
@@ -2442,33 +2442,6 @@ button:disabled {
   width: min(100%, 360px);
 }
 
-.settlement-avatar-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-.settlement-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
-  border: 1px solid rgba(2, 64, 89, 0.18);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(230, 243, 247, 0.96));
-  color: #1c6075;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.settlement-arrow {
-  color: #97a7af;
-  font-size: 1.9rem;
-  line-height: 1;
-}
-
 .settlement-copy {
   margin: 0 0 10px;
   text-align: center;
@@ -2539,6 +2512,107 @@ button:disabled {
   outline: none;
   border-color: rgba(53, 128, 153, 0.7);
   box-shadow: 0 0 0 3px rgba(96, 222, 172, 0.15);
+}
+
+/* Perspective toggle */
+.settle-perspective-toggle {
+  display: flex;
+  gap: 4px;
+  background: rgba(6, 47, 68, 0.08);
+  border-radius: 999px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+
+.settle-perspective-btn {
+  flex: 1;
+  height: 34px;
+  border-radius: 999px;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ink-700);
+  transition: all 180ms ease;
+}
+
+.settle-perspective-btn.is-active {
+  background: linear-gradient(130deg, var(--ink-700), var(--ink-800));
+  color: #ddf8f0;
+  box-shadow: 0 4px 10px rgba(6, 47, 68, 0.22);
+}
+
+/* Member chip selector */
+.settle-member-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.settle-member-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(6, 47, 68, 0.14);
+  background: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  transition: all 160ms ease;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink-800);
+}
+
+.settle-member-chip:hover {
+  border-color: rgba(96, 222, 172, 0.6);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.settle-member-chip.is-selected {
+  border-color: rgba(96, 222, 172, 0.8);
+  background: rgba(96, 222, 172, 0.1);
+  box-shadow: 0 0 0 2px rgba(96, 222, 172, 0.38);
+}
+
+.settle-chip-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: linear-gradient(140deg, rgba(6, 47, 68, 0.96), rgba(24, 104, 133, 0.9));
+  color: #ddf8f0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.settle-chip-balance {
+  font-size: 0.78rem;
+  color: #356979;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+/* Direction pill */
+.settle-direction-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(6, 47, 68, 0.07);
+  border: 1px solid rgba(6, 47, 68, 0.14);
+  color: var(--ink-800);
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+  padding: 0 14px;
+  letter-spacing: 0.1px;
 }
 
 .settlement-expense-pick-list {
