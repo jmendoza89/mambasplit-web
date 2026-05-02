@@ -79,6 +79,26 @@ async function request(path, method = "GET", body = null, auth = true) {
   }
 }
 
+async function getPayloadKb(response) {
+  const contentLength = response.headers.get("Content-Length");
+  if (contentLength !== null) {
+    const parsedLength = Number(contentLength);
+    if (Number.isFinite(parsedLength) && parsedLength >= 0) {
+      return parsedLength / 1024;
+    }
+  }
+
+  try {
+    const text = await response.clone().text();
+    if (typeof Blob === "function") {
+      return new Blob([text]).size / 1024;
+    }
+    return new TextEncoder().encode(text).length / 1024;
+  } catch {
+    return 0;
+  }
+}
+
 async function refreshAccessToken() {
   if (refreshInFlight) return refreshInFlight;
 
@@ -109,7 +129,8 @@ async function refreshAccessToken() {
   }
 }
 
-export async function api(path, method = "GET", body = null, auth = true) {
+async function apiInternal(path, method = "GET", body = null, auth = true, includeMetadata = false) {
+  const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   let response = await request(path, method, body, auth);
   const isAuthRoute = path.startsWith("/api/v1/auth/");
   if (auth && !isAuthRoute && (response.status === 401 || response.status === 403)) {
@@ -117,7 +138,17 @@ export async function api(path, method = "GET", body = null, auth = true) {
     response = await request(path, method, body, auth);
   }
 
-  if (response.status === 204) return null;
+  const endedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const metadata = includeMetadata
+    ? {
+        fetchMs: endedAt - startedAt,
+        payloadKb: await getPayloadKb(response)
+      }
+    : null;
+
+  if (response.status === 204) {
+    return includeMetadata ? { data: null, metadata } : null;
+  }
 
   let data = null;
   try {
@@ -130,7 +161,19 @@ export async function api(path, method = "GET", body = null, auth = true) {
     throw await createErrorFromResponse(response, "Request failed");
   }
 
+  if (includeMetadata) {
+    return { data, metadata };
+  }
+
   return data;
+}
+
+export async function api(path, method = "GET", body = null, auth = true) {
+  return apiInternal(path, method, body, auth, false);
+}
+
+export async function apiWithMetadata(path, method = "GET", body = null, auth = true) {
+  return apiInternal(path, method, body, auth, import.meta.env.DEV);
 }
 
 export const authApi = {
@@ -157,6 +200,7 @@ export const groupsApi = {
   delete: (groupId) => api(`/api/v1/groups/${groupId}`, "DELETE"),
   leaveGroup: (groupId) => api(`/api/v1/groups/${groupId}/members/me`, "DELETE"),
   details: (groupId) => api(`/api/v1/groups/${groupId}/details`),
+  detailsWithMetadata: (groupId) => apiWithMetadata(`/api/v1/groups/${groupId}/details`),
   createEqualExpense: (groupId, payload) => api(`/api/v1/groups/${groupId}/expenses/equal`, "POST", payload),
   deleteExpense: (groupId, expenseId) => api(`/api/v1/groups/${groupId}/expenses/${expenseId}`, "DELETE"),
   createSettlement: (groupId, payload) => api(`/api/v1/groups/${groupId}/settlements`, "POST", payload),

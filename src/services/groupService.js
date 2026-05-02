@@ -15,6 +15,7 @@ export const groupService = {
   create: groupsApi.create,
   list: groupsApi.list,
   details: groupsApi.details,
+  detailsWithMetadata: groupsApi.detailsWithMetadata,
   delete: groupsApi.delete,
   createInvite: (groupId, email, displayName) => groupsApi.createInvite(groupId, email, displayName),
   listGroupInvites: groupsApi.listGroupInvites,

@@ -8,6 +8,7 @@ import DashboardView from "./views/DashboardView";
 import ExpenseModal from "./views/ExpenseModal";
 import GroupView from "./views/GroupView";
 import AccountView from "./views/AccountView";
+import PerfOverlay from "./components/dev/PerfOverlay";
 import { itemVariants, listVariants } from "./views/animations";
 import Alerts from "./views/components/Alerts";
 import Header from "./views/components/Header";
@@ -225,6 +226,7 @@ export default function App() {
         setExpenseAmount={actions.setExpenseAmount}
         setExpensePayerUserId={actions.setExpensePayerUserId}
       />
+      <PerfOverlay />
     </AlertContext.Provider>
     </AuthContext.Provider>
   );

@@ -9,6 +9,7 @@ import {
   selectDisplayedGroup
 } from "../models";
 import { groupService } from "../services";
+import { devPerfStore } from "../stores/devPerfStore";
 import { isUuid, toNumberAmount } from "../utils/formatters";
 import { validateExpenseAmount, validateExpenseDescription, validateFields } from "../utils/validation";
 
@@ -49,6 +50,7 @@ export function useGroupController({
   const [recentSettlementId, setRecentSettlementId] = useState(null);
   const expenseDescriptionRef = useRef(null);
   const expenseAmountRef = useRef(null);
+  const inFlightGroupDetailIdsRef = useRef(new Set());
 
   const selectedGroup = useMemo(
     () => findSelectedGroup(groups, selectedGroupId),
@@ -107,12 +109,27 @@ export function useGroupController({
     if (!groupId) return;
     const force = options.force === true;
     if (!force && groupDetailStatusById[groupId] === 403) return;
+    if (inFlightGroupDetailIdsRef.current.has(groupId)) return;
+
+    inFlightGroupDetailIdsRef.current.add(groupId);
     setGroupLoading(true);
     setLocalGroupError("");
     setGroupError("");
 
     try {
-      const detail = await groupService.details(groupId);
+      if (import.meta.env.DEV) {
+        devPerfStore.startGroupOpen();
+      }
+
+      const detailResult = import.meta.env.DEV
+        ? await groupService.detailsWithMetadata(groupId)
+        : { data: await groupService.details(groupId), metadata: null };
+      const detail = detailResult.data;
+
+      if (import.meta.env.DEV) {
+        devPerfStore.recordGroupDetailsFetch(detail, detailResult.metadata);
+      }
+
       setGroupDetail(detail);
 
       // Sync the user's personal balance from detail back into the groups list
@@ -143,6 +160,7 @@ export function useGroupController({
       setGroupError(finalMessage);
       setGroupDetailStatusById((prev) => ({ ...prev, [groupId]: err?.status || -1 }));
     } finally {
+      inFlightGroupDetailIdsRef.current.delete(groupId);
       setGroupLoading(false);
     }
   }, [groupDetailStatusById, setGroupError, setGroupDetail, setGroupDetailStatusById, setGroups]);

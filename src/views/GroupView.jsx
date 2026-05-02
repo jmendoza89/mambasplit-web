@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
+import { devPerfStore } from "../stores/devPerfStore";
 import { formatDate, formatMoney, initials } from "../utils/formatters";
 import { resolveGroupBalanceCents } from "../utils/groupBalance";
 import DashboardSentInviteCard from "./components/DashboardSentInviteCard";
@@ -226,6 +227,16 @@ export default function GroupView({
     window.addEventListener("mousedown", handlePointerDown);
     return () => window.removeEventListener("mousedown", handlePointerDown);
   }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || groupLoading || !selectedGroupId) return undefined;
+
+    const frameId = window.requestAnimationFrame(() => {
+      devPerfStore.recordGroupRenderComplete();
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [groupLoading, selectedGroupId, displayMembers.length, unsettledExpenses.length, settledExpenseGroups.length]);
 
   function renderInviteSection({ standalone = false } = {}) {
     return (

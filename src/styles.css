@@ -131,6 +131,88 @@ body {
   color: var(--success);
 }
 
+.dev-perf-overlay {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 14px));
+  z-index: 500;
+  width: min(260px, calc(100vw - 28px));
+  color: #ecfeff;
+  font-size: 0.78rem;
+}
+
+.dev-perf-toggle {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(236, 254, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(6, 47, 68, 0.94);
+  color: #ecfeff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.dev-perf-panel {
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid rgba(236, 254, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(6, 47, 68, 0.94);
+  box-shadow: var(--shadow-md);
+}
+
+.dev-perf-panel dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.dev-perf-panel dl div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dev-perf-panel dt {
+  color: #b7edf4;
+  font-weight: 700;
+}
+
+.dev-perf-panel dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.dev-perf-copy {
+  width: 100%;
+  min-height: 32px;
+  margin-top: 10px;
+  border: 1px solid rgba(123, 232, 191, 0.36);
+  border-radius: 8px;
+  background: rgba(96, 222, 172, 0.16);
+  color: #ecfeff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dev-perf-copy:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.dev-perf-panel p {
+  margin: 8px 0 0;
+  color: #9cd9e2;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .card {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 252, 253, 0.88));
