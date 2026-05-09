@@ -509,20 +509,12 @@ export default function GroupView({
               >
                 <h3>Recent Expenses</h3>
                 {unsettledExpenses.length ? (
-                  <motion.ul
-                    className="expense-list"
-                    variants={listVariants}
-                    initial="hidden"
-                    animate="visible"
-                  >
+                  <ul className="expense-list">
                     {unsettledExpenses.map((expense, index) => (
-                      <motion.li
+                      <li
                         key={expense.id || `${expense.description}-${index}`}
                         className="expense-card"
-                        variants={itemVariants}
-                        layout
-                        whileHover={{ y: -2, scale: 1.005 }}
-                        transition={{ duration: 0.16 }}
+                        style={{ "--expense-card-index": index }}
                       >
                         <ExpenseCardItem
                           expense={expense}
@@ -546,9 +538,9 @@ export default function GroupView({
                               : "Only the expense owner can delete this expense"
                           }
                         />
-                      </motion.li>
+                      </li>
                     ))}
-                  </motion.ul>
+                  </ul>
                 ) : (
                   <p className="list-empty">No unsettled expenses.</p>
                 )}

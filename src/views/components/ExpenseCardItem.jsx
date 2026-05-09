@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { formatMoney } from "../../utils/formatters";
 
 function normalizeText(value) {
@@ -82,7 +83,7 @@ function buildExpenseCardViewModel(expense, currentUserId, currentUserName) {
   };
 }
 
-export default function ExpenseCardItem({
+function ExpenseCardItem({
   expense,
   currentUserId,
   currentUserName,
@@ -91,7 +92,10 @@ export default function ExpenseCardItem({
   deleteTitle = "Delete this expense",
   showDeleteButton = true
 }) {
-  const view = buildExpenseCardViewModel(expense, currentUserId, currentUserName);
+  const view = useMemo(
+    () => buildExpenseCardViewModel(expense, currentUserId, currentUserName),
+    [expense, currentUserId, currentUserName]
+  );
   const isDeleteDisabled = deleteDisabled || !view.isCurrentUserPayer;
 
   return (
@@ -135,3 +139,5 @@ export default function ExpenseCardItem({
     </>
   );
 }
+
+export default memo(ExpenseCardItem);
