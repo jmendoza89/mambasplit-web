@@ -12,6 +12,7 @@ export function normalizeSettlements(group) {
     amountCents: typeof settlement.amountCents === "number" ? settlement.amountCents : 0,
     note: settlement.note || null,
     settledAt: settlement.settledAt || null,
+    expenseCount: typeof settlement.expenseCount === "number" ? settlement.expenseCount : 0,
     expenseIds: Array.isArray(settlement.expenseIds) ? settlement.expenseIds : []
   }));
 }

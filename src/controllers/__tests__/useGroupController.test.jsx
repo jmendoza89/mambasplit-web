@@ -10,7 +10,17 @@ vi.mock("../../services", () => ({
       members: [],
       expenses: []
     })),
+    detailsWithMetadata: vi.fn(async () => ({
+      data: {
+        group: { id: "group-1", name: "Trip" },
+        members: [],
+        expenses: []
+      },
+      metadata: null
+    })),
+    listExpenses: vi.fn(async () => ({ expenses: [], hasMoreExpenses: false, nextBefore: null })),
     listGroupSettlements: vi.fn(async () => ({ settlements: [] })),
+    listSettlementExpenses: vi.fn(async () => ({ expenses: [], hasMoreExpenses: false, nextBefore: null })),
     createEqualExpense: vi.fn(async () => {}),
     deleteExpense: vi.fn(async () => {}),
     delete: vi.fn(async () => {}),
@@ -318,5 +328,120 @@ describe("useGroupController", () => {
     const calledWith = setGroups.mock.calls[0][0];
     expect(Array.isArray(calledWith)).toBe(true);
     expect(calledWith.find((g) => g.id === "group-1")).toBeUndefined();
+  });
+
+  it("loads older expenses and appends them to group detail", async () => {
+    const setGroupDetail = vi.fn();
+    groupService.detailsWithMetadata.mockResolvedValueOnce({
+      data: {
+        group: { id: "group-1", name: "Trip" },
+        members: [],
+        expenses: [{ id: "expense-1", createdAt: "2026-05-08T12:00:00Z" }],
+        hasMoreExpenses: true
+      },
+      metadata: null
+    });
+    groupService.listExpenses.mockResolvedValueOnce({
+      expenses: [{ id: "expense-2", createdAt: "2026-05-07T12:00:00Z" }],
+      hasMoreExpenses: false,
+      nextBefore: null
+    });
+
+    const { result } = renderHook(() =>
+      useGroupController(makeHookArgs({
+        activeView: "dashboard",
+        groupDetail: null,
+        setGroupDetail
+      }))
+    );
+
+    await act(async () => {
+      await result.current.actions.onOpenGroupPage("group-1");
+    });
+    await act(async () => {
+      await result.current.actions.onLoadOlderExpenses();
+    });
+
+    expect(groupService.listExpenses).toHaveBeenCalledWith("group-1", {
+      before: "2026-05-08T12:00:00Z",
+      limit: 25
+    });
+    const updater = setGroupDetail.mock.calls.at(-1)[0];
+    expect(updater({ expenses: [{ id: "expense-1" }] }).expenses).toEqual([
+      { id: "expense-1" },
+      { id: "expense-2", createdAt: "2026-05-07T12:00:00Z" }
+    ]);
+  });
+
+  it("loads more settlement metadata rows", async () => {
+    const setGroupDetail = vi.fn();
+    groupService.detailsWithMetadata.mockResolvedValueOnce({
+      data: {
+        group: { id: "group-1", name: "Trip" },
+        members: [],
+        expenses: [],
+        settlements: [{ id: "settlement-1", settledAt: "2026-05-08T12:00:00Z" }],
+        hasMoreSettlements: true
+      },
+      metadata: null
+    });
+    groupService.listGroupSettlements.mockResolvedValueOnce({
+      settlements: [{ id: "settlement-2", settledAt: "2026-05-07T12:00:00Z" }],
+      hasMoreSettlements: false,
+      nextBefore: null
+    });
+
+    const { result } = renderHook(() =>
+      useGroupController(makeHookArgs({
+        activeView: "dashboard",
+        groupDetail: null,
+        setGroupDetail
+      }))
+    );
+
+    await act(async () => {
+      await result.current.actions.onOpenGroupPage("group-1");
+    });
+    await act(async () => {
+      await result.current.actions.onLoadMoreSettlements();
+    });
+
+    expect(groupService.listGroupSettlements).toHaveBeenCalledWith("group-1", {
+      before: "2026-05-08T12:00:00Z",
+      limit: 5
+    });
+    const updater = setGroupDetail.mock.calls.at(-1)[0];
+    expect(updater({ settlements: [{ id: "settlement-1" }] }).settlements).toEqual([
+      { id: "settlement-1" },
+      { id: "settlement-2", settledAt: "2026-05-07T12:00:00Z" }
+    ]);
+  });
+
+  it("loads linked expenses for one settlement", async () => {
+    groupService.listSettlementExpenses.mockResolvedValueOnce({
+      expenses: [{
+        id: "expense-1",
+        description: "Dinner",
+        amountCents: 1200,
+        payerUserId: "00000000-0000-4000-8000-000000000001",
+        createdAt: "2026-05-08T12:00:00Z",
+        splits: []
+      }],
+      hasMoreExpenses: true,
+      nextBefore: "2026-05-08T12:00:00Z"
+    });
+
+    const { result } = renderHook(() => useGroupController(makeHookArgs()));
+
+    await act(async () => {
+      await result.current.actions.onLoadSettlementExpenses("settlement-1");
+    });
+
+    expect(groupService.listSettlementExpenses).toHaveBeenCalledWith("group-1", "settlement-1", {
+      before: null,
+      limit: 25
+    });
+    expect(result.current.state.settlementExpensePages["settlement-1"].expenses).toHaveLength(1);
+    expect(result.current.state.settlementExpensePages["settlement-1"].hasMoreExpenses).toBe(true);
   });
 });
