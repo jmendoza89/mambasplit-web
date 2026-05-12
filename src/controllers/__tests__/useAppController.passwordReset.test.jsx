@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppController } from "../useAppController";
 
 let capturedSetBusy = null;
+const mockLoadOlderExpenses = vi.fn();
+const mockLoadMoreSettlements = vi.fn();
+const mockLoadSettlementExpenses = vi.fn();
 
 vi.mock("../../api", () => ({
   getStoredUser: vi.fn(() => null)
@@ -71,6 +74,18 @@ vi.mock("../useGroupController", () => ({
       expenses: [],
       settlements: [],
       settlementSuggestions: [],
+      hasMoreExpenses: true,
+      expensesPageLoading: false,
+      expensesPageError: "",
+      hasMoreSettlements: true,
+      settlementsPageLoading: false,
+      settlementsPageError: "",
+      settlementExpensePages: {
+        "settlement-1": {
+          loaded: true,
+          expenses: [{ id: "expense-1" }]
+        }
+      },
       isExpenseModalOpen: false,
       isSettleUpModalOpen: false,
       recentSettlementId: "",
@@ -92,6 +107,9 @@ vi.mock("../useGroupController", () => ({
       onCreateExpense: vi.fn(),
       onExpenseDescriptionKeyDown: vi.fn(),
       onOpenExpenseModal: vi.fn(),
+      onLoadOlderExpenses: mockLoadOlderExpenses,
+      onLoadMoreSettlements: mockLoadMoreSettlements,
+      onLoadSettlementExpenses: mockLoadSettlementExpenses,
       onCloseExpenseModal: vi.fn(),
       onOpenSettleUpModal: vi.fn(),
       onCloseSettleUpModal: vi.fn(),
@@ -107,6 +125,9 @@ describe("useAppController password reset flow", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     capturedSetBusy = null;
+    mockLoadOlderExpenses.mockClear();
+    mockLoadMoreSettlements.mockClear();
+    mockLoadSettlementExpenses.mockClear();
     localStorage.clear();
     window.history.replaceState({}, "", "/");
   });
@@ -226,5 +247,21 @@ describe("useAppController password reset flow", () => {
     });
 
     expect(result.current.state.error).toBe("");
+  });
+
+  it("exposes group pagination state and actions to the app view", () => {
+    const { result } = renderHook(() => useAppController());
+
+    expect(result.current.state.hasMoreExpenses).toBe(true);
+    expect(result.current.state.hasMoreSettlements).toBe(true);
+    expect(result.current.state.settlementExpensePages["settlement-1"].expenses).toEqual([{ id: "expense-1" }]);
+
+    result.current.actions.onLoadOlderExpenses();
+    result.current.actions.onLoadMoreSettlements();
+    result.current.actions.onLoadSettlementExpenses("settlement-1");
+
+    expect(mockLoadOlderExpenses).toHaveBeenCalledOnce();
+    expect(mockLoadMoreSettlements).toHaveBeenCalledOnce();
+    expect(mockLoadSettlementExpenses).toHaveBeenCalledWith("settlement-1");
   });
 });

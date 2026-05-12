@@ -43,7 +43,13 @@ export default function GroupView({
   expenses,
   settlements,
   settlementSuggestions,
-  recentSettlementId,
+  hasMoreExpenses = false,
+  expensesPageLoading = false,
+  expensesPageError = "",
+  hasMoreSettlements = false,
+  settlementsPageLoading = false,
+  settlementsPageError = "",
+  settlementExpensePages = {},
   listVariants,
   itemVariants,
   sentInvites = [],
@@ -53,6 +59,9 @@ export default function GroupView({
   onDeleteInvite,
   onRefreshInvite,
   onOpenExpenseModal,
+  onLoadOlderExpenses,
+  onLoadMoreSettlements,
+  onLoadSettlementExpenses,
   onOpenSettleUpModal,
   onCloseSettleUpModal,
   onCreateSettlement,
@@ -67,12 +76,13 @@ export default function GroupView({
   const { currentId, currentName, onLogout } = useAuth();
   const { busy } = useAlerts();
   const showBalanceDiagnostics = false;
-  const [collapsedSettlementIds, setCollapsedSettlementIds] = useState({});
   const [inviteFriendName, setInviteFriendName] = useState("");
   const [inviteFriendEmail, setInviteFriendEmail] = useState("");
   const [mobileSection, setMobileSection] = useState("members");
   const [isMobileLayout, setIsMobileLayout] = useState(getIsMobileLayout);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [collapsedSettlementIds, setCollapsedSettlementIds] = useState({});
   const groupAvatarMenuRef = useRef(null);
   const activeExpenses = useMemo(() => {
     const hiddenIds = new Set();
@@ -147,41 +157,20 @@ export default function GroupView({
       hasMismatch: rows.some((row) => row.deltaCents !== 0)
     };
   }, [displayMembers, unsettledNetByUserId]);
-  const settledExpenseGroups = useMemo(() => {
-    const grouped = activeExpenses.reduce((acc, expense) => {
-      const effectiveSettlementId = expense.settlementId
-        || (settledExpenseIdSet.has(expense.id)
-          ? (settlements || []).find((settlement) => (settlement.expenseIds || []).includes(expense.id))?.id
-          : null);
-      if (!effectiveSettlementId) return acc;
-      if (!acc[effectiveSettlementId]) acc[effectiveSettlementId] = [];
-      acc[effectiveSettlementId].push(expense);
-      return acc;
-    }, {});
-
-    return Object.entries(grouped).map(([settlementId, items]) => ({
-      settlementId,
-      expenses: items,
-      totalCents: items.reduce((sum, expense) => sum + (expense.amountCents || 0), 0)
-    }));
-  }, [activeExpenses, settledExpenseIdSet, settlements]);
-
-  const settlementMap = useMemo(
-    () => new Map((settlements || []).map((settlement) => [settlement.id, settlement])),
-    [settlements]
-  );
+  const settlementRows = useMemo(() => settlements || [], [settlements]);
 
   useEffect(() => {
-    const nextState = {};
-    for (const group of settledExpenseGroups) {
-      nextState[group.settlementId] = true;
-    }
-    setCollapsedSettlementIds(nextState);
-  }, [settledExpenseGroups, recentSettlementId]);
-
-  function toggleSettlement(settlementId) {
-    setCollapsedSettlementIds((prev) => ({ ...prev, [settlementId]: !prev[settlementId] }));
-  }
+    setCollapsedSettlementIds((prev) => {
+      const visibleIds = new Set(settlementRows.map((settlement) => settlement.id));
+      const next = {};
+      for (const [settlementId, isCollapsed] of Object.entries(prev)) {
+        if (visibleIds.has(settlementId)) {
+          next[settlementId] = isCollapsed;
+        }
+      }
+      return next;
+    });
+  }, [settlementRows]);
 
   function clearInviteDraft() {
     setInviteFriendName("");
@@ -229,6 +218,16 @@ export default function GroupView({
   }, []);
 
   useEffect(() => {
+    function handleScroll() {
+      setShowBackToTop(window.scrollY > 520);
+    }
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
     if (!import.meta.env.DEV || groupLoading || !selectedGroupId) return undefined;
 
     const frameId = window.requestAnimationFrame(() => {
@@ -236,7 +235,7 @@ export default function GroupView({
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [groupLoading, selectedGroupId, displayMembers.length, unsettledExpenses.length, settledExpenseGroups.length]);
+  }, [groupLoading, selectedGroupId, displayMembers.length, unsettledExpenses.length, settlementRows.length]);
 
   function renderInviteSection({ standalone = false } = {}) {
     return (
@@ -313,6 +312,22 @@ export default function GroupView({
         ) : null}
       </div>
     );
+  }
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleSettlementCardClick(settlementId, isLoaded) {
+    if (!isLoaded) {
+      onLoadSettlementExpenses(settlementId);
+      return;
+    }
+
+    setCollapsedSettlementIds((prev) => ({
+      ...prev,
+      [settlementId]: !prev[settlementId]
+    }));
   }
 
   return (
@@ -544,22 +559,40 @@ export default function GroupView({
                 ) : (
                   <p className="list-empty">No unsettled expenses.</p>
                 )}
+                {expensesPageError ? <p className="alert">{expensesPageError}</p> : null}
+                {hasMoreExpenses && unsettledExpenses.length > 0 ? (
+                  <div className="expense-pagination-actions">
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={onLoadOlderExpenses}
+                      disabled={busy || expensesPageLoading}
+                    >
+                      {expensesPageLoading ? "Loading..." : "Load more"}
+                    </button>
+                  </div>
+                ) : null}
 
-                {settledExpenseGroups.length ? (
+                {settlementRows.length ? (
                   <div className="group-expenses-settled">
                     <h4>Settled Expense Groups</h4>
                     <ul className="settled-group-list">
-                      {settledExpenseGroups.map((group) => {
-                        const settlement = settlementMap.get(group.settlementId);
-                        const isCollapsed = collapsedSettlementIds[group.settlementId] !== false;
+                      {settlementRows.map((settlement) => {
+                        const settlementPage = settlementExpensePages[settlement.id] || {};
+                        const loadedExpenses = settlementPage.expenses || [];
+                        const isLoaded = Boolean(settlementPage.loaded);
+                        const isCollapsed = Boolean(collapsedSettlementIds[settlement.id]);
+                        const isExpanded = isLoaded && !isCollapsed;
                         return (
-                          <li key={group.settlementId} className="settled-group-card">
+                          <li key={settlement.id} className="settled-group-card">
                             <button
                               type="button"
                               className="settled-group-toggle"
-                              onClick={() => toggleSettlement(group.settlementId)}
-                              aria-expanded={!isCollapsed}
-                              aria-controls={`settlement-group-${group.settlementId}`}
+                              onClick={() => handleSettlementCardClick(settlement.id, isLoaded)}
+                              aria-expanded={isExpanded}
+                              aria-controls={`settlement-group-${settlement.id}`}
+                              aria-label={`Load settlement expenses for ${settlement.fromUserName || "member"} and ${settlement.toUserName || "member"}`}
+                              disabled={busy || settlementPage.loading}
                             >
                               <div className="settled-group-main">
                                 <p className="settled-group-title">
@@ -568,18 +601,22 @@ export default function GroupView({
                                   <strong>{settlement?.toUserName || "Member"}</strong>
                                 </p>
                                 <p className="settled-group-meta">
-                                  Amount: {formatMoney((settlement?.amountCents || group.totalCents) / 100)}
+                                  Amount: {formatMoney((settlement?.amountCents || 0) / 100)}
                                   {" | "}Settled: {formatDate(settlement?.settledAt)}
-                                  {" | "}Expenses: {group.expenses.length}
+                                  {" | "}Expenses: {settlement?.expenseCount || 0}
                                 </p>
                               </div>
-                              <span className="settled-toggle-pill">{isCollapsed ? "Expand" : "Collapse"}</span>
+                              <span className="settled-toggle-pill">
+                                {settlementPage.loading ? "Loading..." : isExpanded ? "Collapse" : "Load"}
+                              </span>
                             </button>
 
-                            {!isCollapsed ? (
-                              <div id={`settlement-group-${group.settlementId}`} className="settled-group-body">
+                            {settlementPage.error ? <p className="alert">{settlementPage.error}</p> : null}
+
+                            {isExpanded ? (
+                              <div id={`settlement-group-${settlement.id}`} className="settled-group-body">
                                 <ul className="expense-list settled-expense-list">
-                                  {group.expenses.map((expense) => (
+                                  {loadedExpenses.map((expense) => (
                                     <li key={expense.id} className="expense-card expense-card-no-delete">
                                       <ExpenseCardItem
                                         expense={expense}
@@ -590,12 +627,40 @@ export default function GroupView({
                                     </li>
                                   ))}
                                 </ul>
+                                {settlementPage.hasMoreExpenses ? (
+                                  <div className="expense-pagination-actions">
+                                    <button
+                                      type="button"
+                                      className="btn-ghost"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        onLoadSettlementExpenses(settlement.id);
+                                      }}
+                                      disabled={busy || settlementPage.loading}
+                                    >
+                                      {settlementPage.loading ? "Loading..." : "Load more"}
+                                    </button>
+                                  </div>
+                                ) : null}
                               </div>
                             ) : null}
                           </li>
                         );
                       })}
                     </ul>
+                    {settlementsPageError ? <p className="alert">{settlementsPageError}</p> : null}
+                    {hasMoreSettlements && settlementRows.length > 0 ? (
+                      <div className="expense-pagination-actions">
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          onClick={onLoadMoreSettlements}
+                          disabled={busy || settlementsPageLoading}
+                        >
+                          {settlementsPageLoading ? "Loading..." : "Load more settlements"}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </motion.article>
@@ -636,6 +701,18 @@ export default function GroupView({
         currentUserUnsettledNetCents={currentUserUnsettledNetCents}
         busy={busy}
       />
+
+      {showBackToTop ? (
+        <button
+          type="button"
+          className="back-to-top-button"
+          onClick={scrollToTop}
+          aria-label="Back to top"
+          title="Back to top"
+        >
+          <span aria-hidden="true">↑</span>
+        </button>
+      ) : null}
     </section>
   );
 }

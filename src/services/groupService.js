@@ -26,9 +26,11 @@ export const groupService = {
   acceptPendingInviteById: invitesApi.acceptById,
   leaveGroup: groupsApi.leaveGroup,
   createEqualExpense: groupsApi.createEqualExpense,
+  listExpenses: groupsApi.listExpenses,
   deleteExpense: groupsApi.deleteExpense,
   createSettlement: groupsApi.createSettlement,
   listGroupSettlements: groupsApi.listSettlements,
+  listSettlementExpenses: groupsApi.listSettlementExpenses,
   getSettlement: settlementsApi.getById,
   listUserSettlements: settlementsApi.listByUser,
   searchUsers: usersApi.search

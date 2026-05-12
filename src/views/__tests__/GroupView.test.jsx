@@ -54,6 +54,13 @@ function renderView(overrideProps = {}) {
     settlements: [],
     settlementSuggestions: [],
     recentSettlementId: null,
+    hasMoreExpenses: false,
+    expensesPageLoading: false,
+    expensesPageError: "",
+    hasMoreSettlements: false,
+    settlementsPageLoading: false,
+    settlementsPageError: "",
+    settlementExpensePages: {},
     listVariants: {},
     itemVariants: {},
     sentInvites: [],
@@ -63,6 +70,9 @@ function renderView(overrideProps = {}) {
     onDeleteInvite: vi.fn(),
     onRefreshInvite: vi.fn(),
     onOpenExpenseModal: vi.fn(),
+    onLoadOlderExpenses: vi.fn(),
+    onLoadMoreSettlements: vi.fn(),
+    onLoadSettlementExpenses: vi.fn(),
     onOpenSettleUpModal: vi.fn(),
     onCloseSettleUpModal: vi.fn(),
     onCreateSettlement: vi.fn(),
@@ -101,7 +111,11 @@ function renderView(overrideProps = {}) {
 }
 
 describe("GroupView", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+    vi.restoreAllMocks();
+  });
 
   it("uses the same mapped balance as the dashboard card for the group hero", () => {
     renderView();
@@ -254,5 +268,205 @@ describe("GroupView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
     expect(screen.getByText("Settled Expense Groups")).toBeInTheDocument();
+  });
+
+  it("calls onLoadOlderExpenses from the Recent Expenses pager", () => {
+    const onLoadOlderExpenses = vi.fn();
+    renderView({
+      hasMoreExpenses: true,
+      onLoadOlderExpenses,
+      expenses: [{
+        id: "expense-1",
+        description: "Lunch",
+        amountCents: 1200,
+        payerUserId: "user-1",
+        createdAt: "2026-03-16T00:00:00Z",
+        settlementId: null,
+        splits: []
+      }]
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    expect(onLoadOlderExpenses).toHaveBeenCalledOnce();
+  });
+
+  it("does not show the Recent Expenses pager when there are no visible recent expenses", () => {
+    renderView({
+      hasMoreExpenses: true,
+      expenses: []
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+
+    expect(screen.getByText("No unsettled expenses.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("renders settlement metadata rows and loads linked expenses on demand", () => {
+    const onLoadSettlementExpenses = vi.fn();
+    renderView({
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseCount: 12
+      }],
+      onLoadSettlementExpenses
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+    expect(screen.getByText(/Expenses: 12/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Load settlement expenses/ }));
+
+    expect(onLoadSettlementExpenses).toHaveBeenCalledWith("settlement-1");
+  });
+
+  it("renders loaded settlement expenses and load-more controls", () => {
+    const onLoadSettlementExpenses = vi.fn();
+    renderView({
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseCount: 30
+      }],
+      settlementExpensePages: {
+        "settlement-1": {
+          loaded: true,
+          hasMoreExpenses: true,
+          expenses: [{
+            id: "expense-1",
+            description: "Loaded dinner",
+            amountCents: 3200,
+            payerUserId: "user-1",
+            createdAt: "2026-03-16T00:00:00Z",
+            splits: []
+          }]
+        }
+      },
+      onLoadSettlementExpenses
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+    expect(screen.getByText("Loaded dinner")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Load more" }).at(-1));
+
+    expect(onLoadSettlementExpenses).toHaveBeenCalledWith("settlement-1");
+  });
+
+  it("collapses and reopens a loaded settlement expense group from the card header", () => {
+    renderView({
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseCount: 30
+      }],
+      settlementExpensePages: {
+        "settlement-1": {
+          loaded: true,
+          hasMoreExpenses: false,
+          expenses: [{
+            id: "expense-1",
+            description: "Loaded dinner",
+            amountCents: 3200,
+            payerUserId: "user-1",
+            createdAt: "2026-03-16T00:00:00Z",
+            splits: []
+          }]
+        }
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+    const settlementToggle = screen.getByRole("button", { name: /Load settlement expenses/ });
+
+    expect(screen.getByText("Loaded dinner")).toBeInTheDocument();
+
+    fireEvent.click(settlementToggle);
+
+    expect(screen.queryByText("Loaded dinner")).not.toBeInTheDocument();
+
+    fireEvent.click(settlementToggle);
+
+    expect(screen.getByText("Loaded dinner")).toBeInTheDocument();
+  });
+
+  it("calls onLoadMoreSettlements from the settlement row pager", () => {
+    const onLoadMoreSettlements = vi.fn();
+    renderView({
+      hasMoreSettlements: true,
+      onLoadMoreSettlements,
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseCount: 1
+      }]
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+    fireEvent.click(screen.getByRole("button", { name: "Load more settlements" }));
+
+    expect(onLoadMoreSettlements).toHaveBeenCalledOnce();
+  });
+
+  it("does not show the settled groups pager when there are no settled expense groups", () => {
+    renderView({
+      hasMoreSettlements: true,
+      settlements: []
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+
+    expect(screen.queryByText("Settled Expense Groups")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Load more settlements" })).not.toBeInTheDocument();
+  });
+
+  it("uses the shared centered pager styling for settled expense group paging", () => {
+    renderView({
+      hasMoreSettlements: true,
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseCount: 1
+      }]
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+
+    expect(screen.getByRole("button", { name: "Load more settlements" }).closest(".expense-pagination-actions")).not.toBeNull();
+  });
+
+  it("shows a back-to-top overlay after scrolling and scrolls to the page top", () => {
+    const scrollTo = vi.fn();
+    Object.defineProperty(window, "scrollTo", { configurable: true, value: scrollTo });
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+
+    renderView();
+
+    expect(screen.queryByRole("button", { name: "Back to top" })).not.toBeInTheDocument();
+
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 700 });
+    fireEvent.scroll(window);
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to top" }));
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
   });
 });

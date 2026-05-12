@@ -704,6 +704,31 @@ button:disabled {
   animation: rise 300ms ease-out;
 }
 
+.back-to-top-button {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 80;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid rgba(2, 64, 89, 0.22);
+  background: rgba(255, 255, 255, 0.92);
+  color: #07364c;
+  box-shadow: 0 14px 28px rgba(7, 66, 92, 0.22);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  line-height: 1;
+  backdrop-filter: blur(10px);
+}
+
+.back-to-top-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
 .dash-top {
   display: flex;
   justify-content: space-between;
@@ -2877,6 +2902,16 @@ button:disabled {
   gap: 10px;
 }
 
+.expense-pagination-actions {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 8px;
+}
+
+.expense-pagination-actions .btn-ghost {
+  min-width: 150px;
+}
+
 .member-motion-item {
   border: none;
   background: transparent;
@@ -4340,6 +4375,13 @@ button:disabled {
   .group-page-top {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .back-to-top-button {
+    right: 16px;
+    bottom: 16px;
+    width: 42px;
+    height: 42px;
   }
 
   .account-layout {

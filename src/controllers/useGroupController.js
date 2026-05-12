@@ -19,6 +19,25 @@ function hasConcreteSettlementId(value) {
     && value !== "00000000-0000-0000-0000-000000000000";
 }
 
+function oldestCreatedAt(items = []) {
+  const datedItems = items
+    .map((item) => item?.createdAt || item?.settledAt)
+    .filter(Boolean)
+    .sort();
+  return datedItems[0] || null;
+}
+
+function appendUniqueById(current = [], next = []) {
+  const seen = new Set(current.map((item) => item?.id).filter(Boolean));
+  const appended = [...current];
+  for (const item of next || []) {
+    if (!item?.id || seen.has(item.id)) continue;
+    seen.add(item.id);
+    appended.push(item);
+  }
+  return appended;
+}
+
 export function useGroupController({
   activeView,
   setActiveView,
@@ -48,6 +67,15 @@ export function useGroupController({
   const [isSettleUpModalOpen, setIsSettleUpModalOpen] = useState(false);
   const [isLeaveGroupModalOpen, setIsLeaveGroupModalOpen] = useState(false);
   const [recentSettlementId, setRecentSettlementId] = useState(null);
+  const [hasMoreExpenses, setHasMoreExpenses] = useState(false);
+  const [expensesNextBefore, setExpensesNextBefore] = useState(null);
+  const [expensesPageLoading, setExpensesPageLoading] = useState(false);
+  const [expensesPageError, setExpensesPageError] = useState("");
+  const [hasMoreSettlements, setHasMoreSettlements] = useState(false);
+  const [settlementsNextBefore, setSettlementsNextBefore] = useState(null);
+  const [settlementsPageLoading, setSettlementsPageLoading] = useState(false);
+  const [settlementsPageError, setSettlementsPageError] = useState("");
+  const [settlementExpensePages, setSettlementExpensePages] = useState({});
   const expenseDescriptionRef = useRef(null);
   const expenseAmountRef = useRef(null);
   const inFlightGroupDetailIdsRef = useRef(new Set());
@@ -131,6 +159,13 @@ export function useGroupController({
       }
 
       setGroupDetail(detail);
+      setHasMoreExpenses(Boolean(detail?.hasMoreExpenses));
+      setExpensesNextBefore(oldestCreatedAt(detail?.expenses));
+      setExpensesPageError("");
+      setHasMoreSettlements(Boolean(detail?.hasMoreSettlements));
+      setSettlementsNextBefore(oldestCreatedAt(detail?.settlements));
+      setSettlementsPageError("");
+      setSettlementExpensePages({});
 
       // Sync the user's personal balance from detail back into the groups list
       // so the dashboard card reflects the same balance shown in the group view.
@@ -164,6 +199,102 @@ export function useGroupController({
       setGroupLoading(false);
     }
   }, [groupDetailStatusById, setGroupError, setGroupDetail, setGroupDetailStatusById, setGroups]);
+
+  async function onLoadOlderExpenses() {
+    if (!selectedGroupId || expensesPageLoading || !hasMoreExpenses) return;
+
+    setExpensesPageLoading(true);
+    setExpensesPageError("");
+    try {
+      const page = await groupService.listExpenses(selectedGroupId, {
+        before: expensesNextBefore,
+        limit: 25
+      });
+      setGroupDetail((prev) => ({
+        ...prev,
+        expenses: appendUniqueById(prev?.expenses || [], page?.expenses || []),
+        hasMoreExpenses: Boolean(page?.hasMoreExpenses)
+      }));
+      setHasMoreExpenses(Boolean(page?.hasMoreExpenses));
+      setExpensesNextBefore(page?.nextBefore || oldestCreatedAt(page?.expenses));
+    } catch (err) {
+      setExpensesPageError(err.message || "Could not load older expenses.");
+    } finally {
+      setExpensesPageLoading(false);
+    }
+  }
+
+  async function onLoadMoreSettlements() {
+    if (!selectedGroupId || settlementsPageLoading || !hasMoreSettlements) return;
+
+    setSettlementsPageLoading(true);
+    setSettlementsPageError("");
+    try {
+      const page = await groupService.listGroupSettlements(selectedGroupId, {
+        before: settlementsNextBefore,
+        limit: 5
+      });
+      setGroupDetail((prev) => ({
+        ...prev,
+        settlements: appendUniqueById(prev?.settlements || [], page?.settlements || []),
+        hasMoreSettlements: Boolean(page?.hasMoreSettlements)
+      }));
+      setHasMoreSettlements(Boolean(page?.hasMoreSettlements));
+      setSettlementsNextBefore(page?.nextBefore || oldestCreatedAt(page?.settlements));
+    } catch (err) {
+      setSettlementsPageError(err.message || "Could not load more settlements.");
+    } finally {
+      setSettlementsPageLoading(false);
+    }
+  }
+
+  async function onLoadSettlementExpenses(settlementId) {
+    if (!selectedGroupId || !settlementId) return;
+    const currentPage = settlementExpensePages[settlementId] || {};
+    if (currentPage.loading) return;
+    if (currentPage.loaded && !currentPage.hasMoreExpenses) return;
+
+    setSettlementExpensePages((prev) => ({
+      ...prev,
+      [settlementId]: {
+        ...prev[settlementId],
+        loading: true,
+        error: ""
+      }
+    }));
+
+    try {
+      const page = await groupService.listSettlementExpenses(selectedGroupId, settlementId, {
+        before: currentPage.loaded ? currentPage.nextBefore : null,
+        limit: 25
+      });
+      const pageExpenses = normalizeExpenses({ expenses: page?.expenses || [] }, members);
+      setSettlementExpensePages((prev) => {
+        const previous = prev[settlementId] || {};
+        const expensesForSettlement = appendUniqueById(previous.expenses || [], pageExpenses);
+        return {
+          ...prev,
+          [settlementId]: {
+            expenses: expensesForSettlement,
+            hasMoreExpenses: Boolean(page?.hasMoreExpenses),
+            nextBefore: page?.nextBefore || oldestCreatedAt(page?.expenses),
+            loading: false,
+            error: "",
+            loaded: true
+          }
+        };
+      });
+    } catch (err) {
+      setSettlementExpensePages((prev) => ({
+        ...prev,
+        [settlementId]: {
+          ...prev[settlementId],
+          loading: false,
+          error: err.message || "Could not load settlement expenses."
+        }
+      }));
+    }
+  }
 
   useEffect(() => {
     if (activeView !== "group" || !selectedGroupId) return;
@@ -476,6 +607,13 @@ export function useGroupController({
       isSettleUpModalOpen,
       isLeaveGroupModalOpen,
       recentSettlementId,
+      hasMoreExpenses,
+      expensesPageLoading,
+      expensesPageError,
+      hasMoreSettlements,
+      settlementsPageLoading,
+      settlementsPageError,
+      settlementExpensePages,
       expenseDescription,
       expenseAmount,
       expensePayerUserId,
@@ -490,6 +628,9 @@ export function useGroupController({
       onCreateExpense,
       onExpenseDescriptionKeyDown,
       onOpenExpenseModal,
+      onLoadOlderExpenses,
+      onLoadMoreSettlements,
+      onLoadSettlementExpenses,
       onCloseExpenseModal,
       onOpenSettleUpModal,
       onCloseSettleUpModal,

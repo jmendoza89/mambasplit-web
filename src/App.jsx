@@ -181,6 +181,13 @@ export default function App() {
             settlements={state.settlements}
             settlementSuggestions={state.settlementSuggestions}
             recentSettlementId={state.recentSettlementId}
+            hasMoreExpenses={state.hasMoreExpenses}
+            expensesPageLoading={state.expensesPageLoading}
+            expensesPageError={state.expensesPageError}
+            hasMoreSettlements={state.hasMoreSettlements}
+            settlementsPageLoading={state.settlementsPageLoading}
+            settlementsPageError={state.settlementsPageError}
+            settlementExpensePages={state.settlementExpensePages}
             listVariants={listVariants}
             itemVariants={itemVariants}
             sentInvites={state.sentInvites}
@@ -190,6 +197,9 @@ export default function App() {
             onDeleteInvite={actions.onDeleteInvite}
             onRefreshInvite={actions.onRefreshInvite}
             onOpenExpenseModal={actions.onOpenExpenseModal}
+            onLoadOlderExpenses={actions.onLoadOlderExpenses}
+            onLoadMoreSettlements={actions.onLoadMoreSettlements}
+            onLoadSettlementExpenses={actions.onLoadSettlementExpenses}
             onOpenSettleUpModal={actions.onOpenSettleUpModal}
             onCloseSettleUpModal={actions.onCloseSettleUpModal}
             onCreateSettlement={actions.onCreateSettlement}

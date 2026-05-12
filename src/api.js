@@ -176,6 +176,14 @@ export async function apiWithMetadata(path, method = "GET", body = null, auth = 
   return apiInternal(path, method, body, auth, import.meta.env.DEV);
 }
 
+function pageQuery(options = {}) {
+  const params = new URLSearchParams();
+  if (options.before) params.set("before", options.before);
+  if (options.limit) params.set("limit", String(options.limit));
+  const suffix = params.toString();
+  return suffix ? `?${suffix}` : "";
+}
+
 export const authApi = {
   login: (email, password) => api("/api/v1/auth/login", "POST", { email, password }, false),
   signup: (email, password, displayName) =>
@@ -202,9 +210,12 @@ export const groupsApi = {
   details: (groupId) => api(`/api/v1/groups/${groupId}/details`),
   detailsWithMetadata: (groupId) => apiWithMetadata(`/api/v1/groups/${groupId}/details`),
   createEqualExpense: (groupId, payload) => api(`/api/v1/groups/${groupId}/expenses/equal`, "POST", payload),
+  listExpenses: (groupId, options = {}) => api(`/api/v1/groups/${groupId}/expenses${pageQuery(options)}`),
   deleteExpense: (groupId, expenseId) => api(`/api/v1/groups/${groupId}/expenses/${expenseId}`, "DELETE"),
   createSettlement: (groupId, payload) => api(`/api/v1/groups/${groupId}/settlements`, "POST", payload),
-  listSettlements: (groupId) => api(`/api/v1/groups/${groupId}/settlements`),
+  listSettlements: (groupId, options = {}) => api(`/api/v1/groups/${groupId}/settlements${pageQuery(options)}`),
+  listSettlementExpenses: (groupId, settlementId, options = {}) =>
+    api(`/api/v1/groups/${groupId}/settlements/${settlementId}/expenses${pageQuery(options)}`),
   createInvite: (groupId, email, displayName) => {
     const body = displayName ? { email, displayName } : { email };
     return api(`/api/v1/groups/${groupId}/invites`, "POST", body);
