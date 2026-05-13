@@ -148,7 +148,6 @@ const MOBILE_SECTIONS = [
 ];
 
 export default function DashboardView({
-  selectedGroupId,
   groups,
   newGroupName,
   pendingInvites,
@@ -165,7 +164,6 @@ export default function DashboardView({
   onCreateGroup,
   onAcceptPendingInvite,
   onRefreshPendingInvites,
-  setSelectedGroupId,
   setNewGroupName
 }) {
   const { currentName, currentEmail, currentId, currentAvatarUrl, onLogout } = useAuth();
@@ -279,8 +277,6 @@ export default function DashboardView({
             key={group.id}
             group={group}
             isOwned={isOwnedGroup(group)}
-            isActive={group.id === selectedGroupId}
-            onSelect={setSelectedGroupId}
             onOpen={onOpenGroupPage}
           />
         ))}
@@ -467,28 +463,23 @@ export default function DashboardView({
                                 const group = groups.find((g) => g.id === sharedGroup.groupId);
                                 return (
                                   <li key={sharedGroup.groupId} className="group-summary-card">
-                                    <div className="group-summary-row">
-                                      <div className="group-summary-select">
-                                        <span className="member-avatar-wrap group-summary-avatar-wrap">
-                                          <span className="avatar group-summary-avatar">{initials(sharedGroup.groupName)}</span>
+                                    <button
+                                      type="button"
+                                      className="group-summary-card-trigger"
+                                      onClick={() => group && onOpenGroupPage(group.id)}
+                                      disabled={!group}
+                                      aria-label={`Open group ${sharedGroup.groupName}`}
+                                    >
+                                      <span className="member-avatar-wrap group-summary-avatar-wrap">
+                                        <span className="avatar group-summary-avatar">{initials(sharedGroup.groupName)}</span>
+                                      </span>
+                                      <span className="group-summary-content">
+                                        <span className="group-summary-title">{sharedGroup.groupName}</span>
+                                        <span className={`dashboard-friend-expense-amount is-${balanceTone(sharedGroup.balanceCents)}`.trim()}>
+                                          {sharedGroup.balanceLabel}
                                         </span>
-                                        <span className="group-summary-content">
-                                          <span className="group-summary-title">{sharedGroup.groupName}</span>
-                                          <span className={`dashboard-friend-expense-amount is-${balanceTone(sharedGroup.balanceCents)}`.trim()}>
-                                            {sharedGroup.balanceLabel}
-                                          </span>
-                                        </span>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        className="btn-inline group-summary-open"
-                                        onClick={() => group && onOpenGroupPage(group.id)}
-                                        disabled={!group}
-                                      >
-                                        <span className="group-summary-open-icon" aria-hidden="true">{">"}</span>
-                                        <span>View</span>
-                                      </button>
-                                    </div>
+                                      </span>
+                                    </button>
                                   </li>
                                 );
                               })}

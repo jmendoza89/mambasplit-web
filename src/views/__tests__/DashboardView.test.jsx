@@ -81,7 +81,6 @@ const mockMinaDetail = {
 function renderView(overrideProps = {}, contextOverrides = {}) {
   cleanup();
   const props = {
-    selectedGroupId: "group-1",
     groups: [{ id: "group-1", name: "Love Nest", createdBy: "user-1" }],
     newGroupName: "",
     pendingInvites: [],
@@ -98,7 +97,6 @@ function renderView(overrideProps = {}, contextOverrides = {}) {
     onCreateGroup: vi.fn((event) => event.preventDefault()),
     onAcceptPendingInvite: vi.fn(),
     onRefreshPendingInvites: vi.fn(),
-    setSelectedGroupId: vi.fn(),
     setNewGroupName: vi.fn(),
     ...overrideProps
   };
@@ -303,6 +301,37 @@ describe("DashboardView", () => {
     });
 
     expect(screen.getAllByLabelText("Group owner")).toHaveLength(1);
+  });
+
+  it("opens a dashboard group when the full group card is clicked", () => {
+    const onOpenGroupPage = vi.fn();
+    renderView({ onOpenGroupPage });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open group Love Nest" }));
+
+    expect(onOpenGroupPage).toHaveBeenCalledWith("group-1");
+    expect(screen.queryByRole("button", { name: "View" })).not.toBeInTheDocument();
+  });
+
+  it("opens a shared group from the friend accordion with the full card", async () => {
+    const onOpenGroupPage = vi.fn();
+    friendService.detail.mockResolvedValueOnce(mockMinaDetail);
+
+    renderView({
+      onOpenGroupPage,
+      selectedFriendId: "fc-mina",
+      groups: [
+        { id: "group-1", name: "Love Nest", createdBy: "user-1" },
+        { id: "group-2", name: "Summer Euro Trip", createdBy: "user-2" },
+        { id: "group-3", name: "Lake House Weekend", createdBy: "user-1" }
+      ]
+    });
+
+    const sharedGroupCard = await screen.findByRole("button", { name: "Open group Summer Euro Trip" });
+    fireEvent.click(sharedGroupCard);
+
+    expect(onOpenGroupPage).toHaveBeenCalledWith("group-2");
+    expect(screen.queryByRole("button", { name: "View" })).not.toBeInTheDocument();
   });
 
   it("switches the mobile section panel when a section tab is pressed", () => {

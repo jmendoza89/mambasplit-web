@@ -129,7 +129,6 @@ export default function App() {
             <AuthView />
           ) : state.activeView === "dashboard" ? (
           <DashboardView
-            selectedGroupId={state.selectedGroupId}
             groups={state.groups}
             newGroupName={state.newGroupName}
             pendingInvites={state.pendingInvites}
@@ -146,7 +145,6 @@ export default function App() {
             onCreateGroup={actions.onCreateGroup}
             onAcceptPendingInvite={actions.onAcceptPendingInvite}
             onRefreshPendingInvites={actions.onRefreshPendingInvites}
-            setSelectedGroupId={actions.setSelectedGroupId}
             setNewGroupName={actions.setNewGroupName}
           />
         ) : state.activeView === "account" ? (
