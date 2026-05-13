@@ -131,6 +131,88 @@ body {
   color: var(--success);
 }
 
+.dev-perf-overlay {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(72px, calc(env(safe-area-inset-bottom) + 14px));
+  z-index: 500;
+  width: min(260px, calc(100vw - 28px));
+  color: #ecfeff;
+  font-size: 0.78rem;
+}
+
+.dev-perf-toggle {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(236, 254, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(6, 47, 68, 0.94);
+  color: #ecfeff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.dev-perf-panel {
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid rgba(236, 254, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(6, 47, 68, 0.94);
+  box-shadow: var(--shadow-md);
+}
+
+.dev-perf-panel dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.dev-perf-panel dl div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dev-perf-panel dt {
+  color: #b7edf4;
+  font-weight: 700;
+}
+
+.dev-perf-panel dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.dev-perf-copy {
+  width: 100%;
+  min-height: 32px;
+  margin-top: 10px;
+  border: 1px solid rgba(123, 232, 191, 0.36);
+  border-radius: 8px;
+  background: rgba(96, 222, 172, 0.16);
+  color: #ecfeff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dev-perf-copy:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.dev-perf-panel p {
+  margin: 8px 0 0;
+  color: #9cd9e2;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .card {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(244, 252, 253, 0.88));
@@ -620,6 +702,31 @@ button:disabled {
 
 .dash-wrap {
   animation: rise 300ms ease-out;
+}
+
+.back-to-top-button {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 80;
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid rgba(2, 64, 89, 0.22);
+  background: rgba(255, 255, 255, 0.92);
+  color: #07364c;
+  box-shadow: 0 14px 28px rgba(7, 66, 92, 0.22);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  line-height: 1;
+  backdrop-filter: blur(10px);
+}
+
+.back-to-top-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .dash-top {
@@ -2795,6 +2902,16 @@ button:disabled {
   gap: 10px;
 }
 
+.expense-pagination-actions {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 8px;
+}
+
+.expense-pagination-actions .btn-ghost {
+  min-width: 150px;
+}
+
 .member-motion-item {
   border: none;
   background: transparent;
@@ -2889,6 +3006,25 @@ button:disabled {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 250, 252, 0.96));
   box-shadow: 0 10px 22px rgba(7, 66, 92, 0.12);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+  animation: expense-card-enter 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: min(calc(var(--expense-card-index, 0) * 55ms), 440ms);
+}
+
+.expense-card:hover {
+  transform: translateY(-2px) scale(1.005);
+}
+
+@keyframes expense-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .expense-card::before {
@@ -3050,6 +3186,12 @@ button:disabled {
 .expense-delete-icon:disabled {
   opacity: 0;
   pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expense-card {
+    animation: none;
+  }
 }
 
 .avatar {
@@ -4233,6 +4375,13 @@ button:disabled {
   .group-page-top {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .back-to-top-button {
+    right: 16px;
+    bottom: 16px;
+    width: 42px;
+    height: 42px;
   }
 
   .account-layout {
