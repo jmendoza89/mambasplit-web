@@ -259,7 +259,7 @@ export default function DashboardView({
     || (pendingInvites || []).length > 0;
 
   const activeFriend = useMemo(() => {
-    return friendDirectory.find((friend) => friend.id === selectedFriendId) || friendDirectory[0] || null;
+    return friendDirectory.find((friend) => friend.id === selectedFriendId) || null;
   }, [friendDirectory, selectedFriendId]);
   const activeFriendSummary = useMemo(() => resolveFriendSummary(activeFriend, friendDetail), [activeFriend, friendDetail]);
   const activeFriendSharedGroupCount = useMemo(() => {
@@ -512,7 +512,7 @@ export default function DashboardView({
                     <button
                       type="button"
                       className={`dashboard-friend-accordion-trigger ${isExpanded ? "is-active" : ""}`.trim()}
-                      onClick={() => onSelectFriend(friend.id)}
+                      onClick={() => onSelectFriend(friend.id === selectedFriendId ? "" : friend.id)}
                       aria-expanded={isExpanded}
                     >
                       <span className="avatar dashboard-friend-list-avatar" aria-hidden="true">{initials(friend.displayName)}</span>

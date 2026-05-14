@@ -475,4 +475,22 @@ describe("DashboardView", () => {
 
     expect(screen.queryByRole("dialog", { name: "New group" })).not.toBeInTheDocument();
   });
+
+  it("no friend accordion is expanded when selectedFriendId is empty", () => {
+    renderView({ selectedFriendId: "" });
+
+    const triggers = screen.getAllByRole("button", { name: /(Julio Mendoza|Doug Rosenberger|Mina Torres)/i });
+    for (const trigger of triggers) {
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+    }
+  });
+
+  it("clicking an already-expanded friend collapses it by calling onSelectFriend with empty string", () => {
+    const onSelectFriend = vi.fn();
+    renderView({ selectedFriendId: "fc-doug", onSelectFriend });
+
+    fireEvent.click(screen.getByRole("button", { name: /Doug Rosenberger/i }));
+
+    expect(onSelectFriend).toHaveBeenCalledWith("");
+  });
 });
