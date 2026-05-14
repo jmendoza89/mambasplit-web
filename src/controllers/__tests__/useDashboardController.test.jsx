@@ -105,16 +105,13 @@ describe("useDashboardController", () => {
       return { dashboard, selectedGroupId };
     });
 
-    act(() => {
-      result.current.dashboard.actions.setNewGroupName("Trip");
-    });
-
     await act(async () => {
-      await result.current.dashboard.actions.onCreateGroup({ preventDefault: vi.fn() });
+      await result.current.dashboard.actions.onCreateGroup("Trip");
     });
 
     expect(result.current.selectedGroupId).toBe("g-new");
     expect(setSuccess).toHaveBeenCalledWith("Group created.");
+    expect(onOpenGroupPage).toHaveBeenCalledWith("g-new");
   });
 
   it("loads pending invites for current email", async () => {

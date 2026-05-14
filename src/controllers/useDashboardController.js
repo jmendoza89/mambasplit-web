@@ -181,7 +181,6 @@ export function useDashboardController({
   loadSessionData,
   onOpenGroupPage
 }) {
-  const [newGroupName, setNewGroupName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteResult, setInviteResult] = useState(null);
   const [sentInvites, setSentInvites] = useState([]);
@@ -458,21 +457,20 @@ export function useDashboardController({
     };
   }, [currentId, groupsForEffects, groupsSignature, me]);
 
-  async function onCreateGroup(e) {
-    e.preventDefault();
-    if (!isValidGroupName(newGroupName)) return;
+  async function onCreateGroup(name) {
+    if (!isValidGroupName(name)) return;
 
     setError("");
     setSuccess("");
     setBusy(true);
     try {
-      const created = await groupService.create(newGroupName.trim());
+      const created = await groupService.create(name.trim());
       const updated = [...groups, created];
       setGroups(updated);
       setGroupOwnershipById((prev) => ({ ...prev, [created.id]: true }));
       setSelectedGroupId(created.id);
-      setNewGroupName("");
       setSuccess("Group created.");
+      onOpenGroupPage(created.id);
     } catch (err) {
       setError(err.message || "Could not create group.");
     } finally {
@@ -536,7 +534,6 @@ export function useDashboardController({
   }
 
   function onResetDashboardState() {
-    setNewGroupName("");
     setInviteEmail("");
     setInviteResult(null);
     setSentInvites([]);
@@ -660,7 +657,6 @@ export function useDashboardController({
 
   return {
     state: {
-      newGroupName,
       inviteEmail,
       inviteResult,
       sentInvites,
@@ -676,7 +672,6 @@ export function useDashboardController({
       selectedFriendId
     },
     actions: {
-      setNewGroupName,
       setInviteEmail,
       onCreateGroup,
       onCreateInvite,

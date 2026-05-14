@@ -81,9 +81,7 @@ const mockMinaDetail = {
 function renderView(overrideProps = {}, contextOverrides = {}) {
   cleanup();
   const props = {
-    selectedGroupId: "group-1",
     groups: [{ id: "group-1", name: "Love Nest", createdBy: "user-1" }],
-    newGroupName: "",
     pendingInvites: [],
     pendingInvitesLoading: false,
     pendingInvitesError: "",
@@ -95,11 +93,9 @@ function renderView(overrideProps = {}, contextOverrides = {}) {
     onOpenGroupPage: vi.fn(),
     onOpenAccount: vi.fn(),
     onSelectFriend: vi.fn(),
-    onCreateGroup: vi.fn((event) => event.preventDefault()),
+    onCreateGroup: vi.fn(),
     onAcceptPendingInvite: vi.fn(),
     onRefreshPendingInvites: vi.fn(),
-    setSelectedGroupId: vi.fn(),
-    setNewGroupName: vi.fn(),
     ...overrideProps
   };
 
@@ -305,6 +301,37 @@ describe("DashboardView", () => {
     expect(screen.getAllByLabelText("Group owner")).toHaveLength(1);
   });
 
+  it("opens a dashboard group when the full group card is clicked", () => {
+    const onOpenGroupPage = vi.fn();
+    renderView({ onOpenGroupPage });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open group Love Nest" }));
+
+    expect(onOpenGroupPage).toHaveBeenCalledWith("group-1");
+    expect(screen.queryByRole("button", { name: "View" })).not.toBeInTheDocument();
+  });
+
+  it("opens a shared group from the friend accordion with the full card", async () => {
+    const onOpenGroupPage = vi.fn();
+    friendService.detail.mockResolvedValueOnce(mockMinaDetail);
+
+    renderView({
+      onOpenGroupPage,
+      selectedFriendId: "fc-mina",
+      groups: [
+        { id: "group-1", name: "Love Nest", createdBy: "user-1" },
+        { id: "group-2", name: "Summer Euro Trip", createdBy: "user-2" },
+        { id: "group-3", name: "Lake House Weekend", createdBy: "user-1" }
+      ]
+    });
+
+    const sharedGroupCard = await screen.findByRole("button", { name: "Open group Summer Euro Trip" });
+    fireEvent.click(sharedGroupCard);
+
+    expect(onOpenGroupPage).toHaveBeenCalledWith("group-2");
+    expect(screen.queryByRole("button", { name: "View" })).not.toBeInTheDocument();
+  });
+
   it("switches the mobile section panel when a section tab is pressed", () => {
     renderView({ selectedFriendId: "fc-doug" });
 
@@ -390,5 +417,80 @@ describe("DashboardView", () => {
 
     expect(screen.queryByText("You owe Julio C. Mendoza $52.50")).not.toBeInTheDocument();
   });
-});
 
+  it("New button opens the create group modal", () => {
+    renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+
+    expect(screen.getByRole("dialog", { name: "New group" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "New group" })).toBeInTheDocument();
+  });
+
+  it("Create group modal submits with the draft name", async () => {
+    const onCreateGroup = vi.fn(() => Promise.resolve());
+    renderView({ onCreateGroup });
+
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+
+    fireEvent.change(screen.getByPlaceholderText("Group name"), { target: { value: "Beach Trip" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    await waitFor(() => {
+      expect(onCreateGroup).toHaveBeenCalledWith("Beach Trip");
+    });
+  });
+
+  it("Create group modal closes after successful submit", async () => {
+    const onCreateGroup = vi.fn(() => Promise.resolve());
+    renderView({ onCreateGroup });
+
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+    fireEvent.change(screen.getByPlaceholderText("Group name"), { target: { value: "Beach Trip" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "New group" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("Create group modal closes on Escape key", () => {
+    renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+    expect(screen.getByRole("dialog", { name: "New group" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "New group" })).not.toBeInTheDocument();
+  });
+
+  it("Create group modal closes on close button click", () => {
+    renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+    expect(screen.getByRole("dialog", { name: "New group" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close new group dialog" }));
+
+    expect(screen.queryByRole("dialog", { name: "New group" })).not.toBeInTheDocument();
+  });
+
+  it("no friend accordion is expanded when selectedFriendId is empty", () => {
+    renderView({ selectedFriendId: "" });
+
+    const triggers = screen.getAllByRole("button", { name: /(Julio Mendoza|Doug Rosenberger|Mina Torres)/i });
+    for (const trigger of triggers) {
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+    }
+  });
+
+  it("clicking an already-expanded friend collapses it by calling onSelectFriend with empty string", () => {
+    const onSelectFriend = vi.fn();
+    renderView({ selectedFriendId: "fc-doug", onSelectFriend });
+
+    fireEvent.click(screen.getByRole("button", { name: /Doug Rosenberger/i }));
+
+    expect(onSelectFriend).toHaveBeenCalledWith("");
+  });
+});
