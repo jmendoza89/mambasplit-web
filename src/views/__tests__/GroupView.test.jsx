@@ -469,4 +469,86 @@ describe("GroupView", () => {
 
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
   });
+
+  it("settled-expense toggle pill shows + on mobile when collapsed", () => {
+    renderView({
+      __isMobile: true,
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseCount: 1
+      }]
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+
+    const pill = document.querySelector(".settled-toggle-pill");
+    expect(pill).toHaveTextContent("+");
+  });
+
+  it("settled-expense toggle pill shows \u2212 on mobile when expanded", () => {
+    renderView({
+      __isMobile: true,
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseCount: 1
+      }],
+      settlementExpensePages: {
+        "settlement-1": { loaded: true, hasMoreExpenses: false, expenses: [] }
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+
+    const pill = document.querySelector(".settled-toggle-pill");
+    expect(pill).toHaveTextContent("\u2212");
+  });
+
+  it("settled-expense toggle pill shows Load on desktop when collapsed", () => {
+    renderView({
+      __isMobile: false,
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseCount: 1
+      }]
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+
+    const pill = document.querySelector(".settled-toggle-pill");
+    expect(pill).toHaveTextContent("Load");
+  });
+
+  it("settled-expense toggle pill shows Collapse on desktop when expanded", () => {
+    renderView({
+      __isMobile: false,
+      settlements: [{
+        id: "settlement-1",
+        fromUserName: "User Two",
+        toUserName: "User One",
+        amountCents: 3200,
+        settledAt: "2026-03-17T00:00:00Z",
+        expenseCount: 1
+      }],
+      settlementExpensePages: {
+        "settlement-1": { loaded: true, hasMoreExpenses: false, expenses: [] }
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Expenses" }));
+
+    const pill = document.querySelector(".settled-toggle-pill");
+    expect(pill).toHaveTextContent("Collapse");
+  });
 });

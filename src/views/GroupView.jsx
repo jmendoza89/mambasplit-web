@@ -607,7 +607,7 @@ export default function GroupView({
                                 </p>
                               </div>
                               <span className="settled-toggle-pill">
-                                {settlementPage.loading ? "Loading..." : isExpanded ? "Collapse" : "Load"}
+                                {settlementPage.loading ? "Loading..." : isMobileLayout ? (isExpanded ? "\u2212" : "+") : (isExpanded ? "Collapse" : "Load")}
                               </span>
                             </button>
 

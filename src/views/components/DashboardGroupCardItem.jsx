@@ -28,8 +28,6 @@ function buildGroupMeta(group) {
 export default function DashboardGroupCardItem({
   group,
   isOwned,
-  isActive,
-  onSelect,
   onOpen
 }) {
   const balance = getBalancePresentation(resolveGroupBalanceCents(group));
@@ -39,37 +37,27 @@ export default function DashboardGroupCardItem({
     <li
       className={[
         "group-summary-card",
-        isActive ? "is-active" : "",
         isOwned ? "group-owner" : "group-member"
       ].filter(Boolean).join(" ")}
     >
-      <div className="group-summary-row">
-        <button
-          type="button"
-          className="group-summary-select"
-          onClick={() => onSelect(group.id)}
-        >
-          <span className="member-avatar-wrap group-summary-avatar-wrap">
-            <span className={`avatar group-summary-avatar ${isOwned ? "avatar-owner" : ""}`.trim()}>{initials(group.name)}</span>
-            {isOwned ? <span className="member-owner-crown" aria-label="Group owner" title="Group owner" /> : null}
+      <button
+        type="button"
+        className="group-summary-card-trigger"
+        onClick={() => onOpen(group.id)}
+        aria-label={`Open group ${group.name}`}
+      >
+        <span className="member-avatar-wrap group-summary-avatar-wrap">
+          <span className={`avatar group-summary-avatar ${isOwned ? "avatar-owner" : ""}`.trim()}>{initials(group.name)}</span>
+          {isOwned ? <span className="member-owner-crown" aria-label="Group owner" title="Group owner" /> : null}
+        </span>
+        <span className="group-summary-content">
+          <span className="group-name-stack">
+            <span className="group-summary-title">{group.name}</span>
           </span>
-          <span className="group-summary-content">
-            <span className="group-name-stack">
-              <span className="group-summary-title">{group.name}</span>
-            </span>
-            <span className={`group-summary-balance ${balance.className}`}>{balance.label}</span>
-            {meta ? <span className="group-summary-meta">{meta}</span> : null}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="btn-inline group-summary-open"
-          onClick={() => onOpen(group.id)}
-        >
-          <span className="group-summary-open-icon" aria-hidden="true">{">"}</span>
-          <span>View</span>
-        </button>
-      </div>
+          <span className={`group-summary-balance ${balance.className}`}>{balance.label}</span>
+          {meta ? <span className="group-summary-meta">{meta}</span> : null}
+        </span>
+      </button>
     </li>
   );
 }
