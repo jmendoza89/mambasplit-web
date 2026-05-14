@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAlerts } from "../contexts/AlertContext";
 import { useAuth } from "../contexts/AuthContext";
 import { formatMoney, initials } from "../utils/formatters";
@@ -62,6 +62,87 @@ function DeclineInviteModal({ invite, busy, onCancel, onConfirm }) {
                 Decline Invite
               </button>
             </div>
+          </div>
+        </motion.section>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function CreateGroupModal({ open, busy, draft, onChangeDraft, onSubmit, onCancel }) {
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (open && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(e) {
+      if (e.key === "Escape") onCancel();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onCancel]);
+
+  if (!open) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="modal-overlay"
+        onClick={onCancel}
+        role="presentation"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.section
+          className="modal-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="createGroupModalTitle"
+          onClick={(e) => e.stopPropagation()}
+          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 8, scale: 0.98 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+        >
+          <div className="modal-header">
+            <div>
+              <h3 id="createGroupModalTitle">New group</h3>
+            </div>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={onCancel}
+              aria-label="Close new group dialog"
+            >
+              x
+            </button>
+          </div>
+          <div className="create-group-modal-body">
+            <form onSubmit={onSubmit}>
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder="Group name"
+                value={draft}
+                onChange={(e) => onChangeDraft(e.target.value)}
+                maxLength={200}
+                required
+              />
+              <div className="actions modal-actions">
+                <button type="button" className="btn-secondary" onClick={onCancel} disabled={busy}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={busy}>
+                  Create
+                </button>
+              </div>
+            </form>
           </div>
         </motion.section>
       </motion.div>
@@ -149,7 +230,6 @@ const MOBILE_SECTIONS = [
 
 export default function DashboardView({
   groups,
-  newGroupName,
   pendingInvites,
   pendingInvitesLoading,
   pendingInvitesError,
@@ -164,10 +244,11 @@ export default function DashboardView({
   onCreateGroup,
   onAcceptPendingInvite,
   onRefreshPendingInvites,
-  setNewGroupName
 }) {
   const { currentName, currentEmail, currentId, currentAvatarUrl, onLogout } = useAuth();
   const { busy } = useAlerts();
+  const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
+  const [createGroupNameDraft, setCreateGroupNameDraft] = useState("");
   const [invitePendingDecline, setInvitePendingDecline] = useState(null);
   const [friendSearch, setFriendSearch] = useState("");
   const [mobileSection, setMobileSection] = useState("groups");
@@ -252,25 +333,33 @@ export default function DashboardView({
     }
   }
 
+  async function handleCreateGroup(e) {
+    e.preventDefault();
+    try {
+      await onCreateGroup(createGroupNameDraft);
+      setIsCreateGroupModalOpen(false);
+      setCreateGroupNameDraft("");
+    } catch {
+      // error shown via alert context; keep modal open
+    }
+  }
+
   const groupsPanel = (
     <article
       className={`card panel section-panel dashboard-sidebar-panel dashboard-mobile-panel ${mobileSection === "groups" ? "is-active" : ""}`}
       data-mobile-panel="groups"
     >
-      <h3>Groups</h3>
-      <form className="inline-form" onSubmit={onCreateGroup}>
-        <input
-          type="text"
-          placeholder="New group name"
-          value={newGroupName}
-          onChange={(event) => setNewGroupName(event.target.value)}
-          maxLength={200}
-          required
-        />
-        <button type="submit" className="btn-secondary" disabled={busy}>
-          Create
+      <div className="groups-panel-header">
+        <h3>Groups</h3>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => setIsCreateGroupModalOpen(true)}
+          disabled={busy}
+        >
+          New
         </button>
-      </form>
+      </div>
       <ul className="list group-list">
         {groups.map((group) => (
           <DashboardGroupCardItem
@@ -511,6 +600,14 @@ export default function DashboardView({
           />
         ) : null}
       </AnimatePresence>
+      <CreateGroupModal
+        open={isCreateGroupModalOpen}
+        busy={busy}
+        draft={createGroupNameDraft}
+        onChangeDraft={setCreateGroupNameDraft}
+        onSubmit={handleCreateGroup}
+        onCancel={() => { setIsCreateGroupModalOpen(false); setCreateGroupNameDraft(""); }}
+      />
     </section>
   );
 }

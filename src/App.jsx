@@ -130,7 +130,6 @@ export default function App() {
           ) : state.activeView === "dashboard" ? (
           <DashboardView
             groups={state.groups}
-            newGroupName={state.newGroupName}
             pendingInvites={state.pendingInvites}
             pendingInvitesLoading={state.pendingInvitesLoading}
             pendingInvitesError={state.pendingInvitesError}
@@ -145,7 +144,6 @@ export default function App() {
             onCreateGroup={actions.onCreateGroup}
             onAcceptPendingInvite={actions.onAcceptPendingInvite}
             onRefreshPendingInvites={actions.onRefreshPendingInvites}
-            setNewGroupName={actions.setNewGroupName}
           />
         ) : state.activeView === "account" ? (
           <AccountView

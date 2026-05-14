@@ -1995,6 +1995,34 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.groups-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.groups-panel-header h3 {
+  margin: 0;
+}
+
+.groups-panel-header + .list {
+  margin-top: 12px;
+}
+
+.create-group-modal-body {
+  padding: 18px;
+}
+
+.create-group-modal-body form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.create-group-modal-body input[type="text"] {
+  width: 100%;
+}
+
 .group-hero-header {
   display: flex;
   align-items: center;

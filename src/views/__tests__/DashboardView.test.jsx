@@ -82,7 +82,6 @@ function renderView(overrideProps = {}, contextOverrides = {}) {
   cleanup();
   const props = {
     groups: [{ id: "group-1", name: "Love Nest", createdBy: "user-1" }],
-    newGroupName: "",
     pendingInvites: [],
     pendingInvitesLoading: false,
     pendingInvitesError: "",
@@ -94,10 +93,9 @@ function renderView(overrideProps = {}, contextOverrides = {}) {
     onOpenGroupPage: vi.fn(),
     onOpenAccount: vi.fn(),
     onSelectFriend: vi.fn(),
-    onCreateGroup: vi.fn((event) => event.preventDefault()),
+    onCreateGroup: vi.fn(),
     onAcceptPendingInvite: vi.fn(),
     onRefreshPendingInvites: vi.fn(),
-    setNewGroupName: vi.fn(),
     ...overrideProps
   };
 
@@ -419,5 +417,62 @@ describe("DashboardView", () => {
 
     expect(screen.queryByText("You owe Julio C. Mendoza $52.50")).not.toBeInTheDocument();
   });
-});
 
+  it("New button opens the create group modal", () => {
+    renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+
+    expect(screen.getByRole("dialog", { name: "New group" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "New group" })).toBeInTheDocument();
+  });
+
+  it("Create group modal submits with the draft name", async () => {
+    const onCreateGroup = vi.fn(() => Promise.resolve());
+    renderView({ onCreateGroup });
+
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+
+    fireEvent.change(screen.getByPlaceholderText("Group name"), { target: { value: "Beach Trip" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    await waitFor(() => {
+      expect(onCreateGroup).toHaveBeenCalledWith("Beach Trip");
+    });
+  });
+
+  it("Create group modal closes after successful submit", async () => {
+    const onCreateGroup = vi.fn(() => Promise.resolve());
+    renderView({ onCreateGroup });
+
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+    fireEvent.change(screen.getByPlaceholderText("Group name"), { target: { value: "Beach Trip" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "New group" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("Create group modal closes on Escape key", () => {
+    renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+    expect(screen.getByRole("dialog", { name: "New group" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: "New group" })).not.toBeInTheDocument();
+  });
+
+  it("Create group modal closes on close button click", () => {
+    renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: "New" }));
+    expect(screen.getByRole("dialog", { name: "New group" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close new group dialog" }));
+
+    expect(screen.queryByRole("dialog", { name: "New group" })).not.toBeInTheDocument();
+  });
+});
